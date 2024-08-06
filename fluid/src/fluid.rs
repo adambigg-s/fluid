@@ -21,21 +21,39 @@ pub enum DiffEle {
     Fluid,
     Static,
     Source,
-    Match,
+    Match(Match),
+}
+
+#[derive(PartialEq, Clone, Copy, Debug)]
+pub struct Match {
+    x: usize,
+    y: usize,
+    master: Vector<isize>,
+}
+
+impl Match {
+    pub fn construct(x: usize, y: usize, mx: isize, my: isize) -> Match {
+        let master: Vector<isize> = Vector::construct(mx, my);
+        Match { x, y, master }
+    }
 }
 
 impl DiffEle {
-    pub fn to_strslice(&self) -> &str {
+    pub fn to_strslice(self) -> &'static str {
         match self {
-            DiffEle::Fluid  => "Fluid",
-            DiffEle::Static => "Solid",
-            DiffEle::Source => "Emitter",
-            DiffEle::Match  => "Match",
+            DiffEle::Fluid    => "Fluid",
+            DiffEle::Static   => "Solid",
+            DiffEle::Source   => "Emitter",
+            DiffEle::Match(_) => "Match",
         }
     }
 
     pub fn is_fluid(&self) -> bool {
-        *self == Self::Fluid
+        matches!(*self, Self::Fluid | Self::Match(_))
+    }
+
+    pub fn is_static(&self) -> bool {
+        *self == Self::Static
     }
 }
 
@@ -56,6 +74,8 @@ pub struct Fluid {
     pub delta_t: f32,
 
     pub cell_size: f32,
+
+    pub matches: Vec<Match>,
 }
 
 impl Fluid {
@@ -64,18 +84,20 @@ impl Fluid {
             x: config.x,
             y: config.y,
 
+            u: vec![vec![0.0; config.x + 1]; config.y],
+            v: vec![vec![0.0; config.x]; config.y + 1],
+            nu: vec![vec![0.0; config.x + 1]; config.y],
+            nv: vec![vec![0.0; config.x]; config.y + 1],
+
+            element: vec![vec![DiffEle::Fluid; config.x]; config.y],
+
             overrelaxation: config.overrelaxation,
             iters: config.iters,
             delta_t: config.delta_t,
 
             cell_size: config.cell_size,
 
-            element: vec![vec![DiffEle::Fluid; config.x]; config.y],
-
-            u: vec![vec![0.0; config.x + 1]; config.y],
-            v: vec![vec![0.0; config.x]; config.y + 1],
-            nu: vec![vec![0.0; config.x + 1]; config.y],
-            nv: vec![vec![0.0; config.x]; config.y + 1],
+            matches: Vec::new(),
         }
     }
 
@@ -85,6 +107,7 @@ impl Fluid {
         self.nu = vec![vec![0.0; self.x + 1]; self.y];
         self.nv = vec![vec![0.0; self.x]; self.y + 1];
         self.element = vec![vec![DiffEle::Fluid; self.x]; self.y];
+        self.matches = Vec::new();
         self.assert_boundary_conditions();
     }
 
@@ -98,44 +121,63 @@ impl Fluid {
         }
     }
 
+    pub fn assert_match_velocity(&mut self) {
+        for mat in self.matches.clone() {
+            let mut oo: Oo = Oo::construct(mat.x, mat.y, self);
+            oo.set_velocity_matched(mat.master.x, mat.master.y);
+        }
+    }
+
     pub fn assert_boundary_conditions(&mut self) {
         for y in 0..self.y {
             for x in 0..self.x {
                 let xx: usize = self.x;
                 let yy: usize = self.y;
                 let mut oo: Oo = Oo::construct(x, y, self);
-                if oo.fluid.element[y][x] == DiffEle::Static {
+                if oo.fluid.element[y][x].is_static() {
                     oo.set_velocity_zeros();
                 }
 
-                if y == 0 || y == yy - 1 || x == 0 {
-                    oo.set_here(DiffEle::Static);
-                    oo.set_velocity_zeros();
-                }
+                // if y == 0 || y == yy - 1 || x == 0 {
+                //     oo.set_here(DiffEle::Static);
+                //     oo.set_velocity_zeros();
+                // }
 
                 if x == 0 {
                     oo.set_here(DiffEle::Source);
                     oo.set_velocity_polarized(60.0, 0.0);
                 }
-                if x == xx-1 {
-                    oo.set_here(DiffEle::Source);
-                    oo.set_velocity_polarized(45.0, 0.0);
-                }
-
-                // if x == xx - 1 {
-                //     oo.set_here(DiffEle::Match);
-                //     oo.set_velocity_matched(-1, 0);
+                // if yy * 2 / 5 < y && y < yy * 3 / 5 && x == 0 {
+                //     oo.set_here(DiffEle::Source);
+                //     oo.set_velocity_polarized(60.0, 0.0);
+                // }
+                // if x == xx-1 {
+                //     oo.set_here(DiffEle::Source);
+                //     oo.set_velocity_polarized(45.0, 0.0);
                 // }
 
-                let center_x = xx / 10;
-                let center_y = yy / 2;
-                let radius = (std::cmp::min(xx, yy) as f32).sqrt() - 3.0;
-                if (x as f32 - center_x as f32).powf(2.0) + (y as f32 - center_y as f32).powf(2.0) 
-                    < radius * radius 
-                {
-                    oo.set_here(DiffEle::Static);
-                    oo.set_velocity_zeros();
+                if x == xx - 1 {
+                    let matched = Match::construct(x, y, -1, 0);
+                    oo.set_here(DiffEle::Match(matched));
                 }
+                if y == 0 {
+                    let matched = Match::construct(x, y, 0, 1);
+                    oo.set_here(DiffEle::Match(matched));
+                }
+                if y == yy-1 {
+                    let matched = Match::construct(x, y, 0, -1);
+                    oo.set_here(DiffEle::Match(matched));
+                }
+
+                // let center_x = xx / 10;
+                // let center_y = yy / 2;
+                // let radius = (std::cmp::min(xx, yy) as f32).sqrt() - 3.0;
+                // if (x as f32 - center_x as f32).powf(2.0) + (y as f32 - center_y as f32).powf(2.0) 
+                //     < radius * radius 
+                // {
+                //     oo.set_here(DiffEle::Static);
+                //     oo.set_velocity_zeros();
+                // }
 
                 // if xx / 10 < x && x < xx * 2 / 10 && yy * 2 / 5 < y && y < yy * 3 / 5 {
                 //     oo.set_here(DiffEle::Static);
@@ -181,10 +223,10 @@ impl Fluid {
         for y in 0..self.y {
             for x in 0..self.x {
                 let color: Color = match self.element[y][x] {
-                    DiffEle::Fluid  => continue,
-                    DiffEle::Static => Color::from_hex(0xae5a41),
-                    DiffEle::Source => Color::from_hex(0x1b85b8),
-                    DiffEle::Match  => Color::from_hex(0x559e83),
+                    DiffEle::Fluid    => continue,
+                    DiffEle::Static   => Color::from_hex(0x000000),
+                    DiffEle::Source   => Color::from_hex(0x1b85b8),
+                    DiffEle::Match(_) => Color::from_hex(0x559e83),
                 };
                 draw_rectangle(
                     x as f32 * self.cell_size,
@@ -252,6 +294,7 @@ impl Fluid {
     pub fn update_fluid(&mut self, project: bool, advect: bool, assert_bc: bool) {
         if project {
             self.projection_gauss_seidel();
+            self.assert_match_velocity();
         }
         if advect {
             self.semi_lagrangian_advection();
@@ -320,7 +363,15 @@ impl<'a> Oo<'a> {
     }
 
     pub fn set_here(&mut self, cell: DiffEle) {
-        self.fluid.element[self.y][self.x] = cell;
+        match cell {
+            DiffEle::Match(mat) => {
+                self.fluid.matches.push(mat);
+                self.fluid.element[self.y][self.x] = cell;
+            }
+            _                   => {
+                self.fluid.element[self.y][self.x] = cell;
+            }
+        }
     }
 
     pub fn peek_element_here(&self, dx: isize, dy: isize) -> DiffEle {
@@ -396,14 +447,13 @@ impl<'a> Oo<'a> {
         *self.peek_velocity_mut(0, -1) = 0.0;
     }
 
-    #[allow(dead_code)]
     pub fn set_velocity_matched(&mut self, dref_x: isize, dref_y: isize) {
         let (rx, ry) = self.index(dref_x, dref_y);
         let v10: f32;
         let vn0: f32;
         let v01: f32;
         let v0n: f32;
-        let damping = 0.93;
+        let damping = 1.0;
         {
             let refr = Oo::construct(rx, ry, self.fluid);
             v10 = refr.peek_velocity(1, 0);
@@ -420,7 +470,7 @@ impl<'a> Oo<'a> {
     pub fn afflicted_area(&self) -> f32 {
         let mut sides: f32 = 0.0;
         for (dx, dy) in get_directions() {
-            if self.peek_element_here(dx, dy) == DiffEle::Fluid {
+            if self.peek_element_here(dx, dy).is_fluid() {
                 sides += 1.0;
             }
         }

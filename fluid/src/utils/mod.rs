@@ -14,21 +14,48 @@ pub fn get_directions() -> [(isize, isize); 4] {
     ]
 }
 
+#[allow(dead_code)]
+pub fn get_directions_8() -> [(isize, isize); 8] {
+    [
+        (-1, 0), 
+        (1, 0), 
+        (0, -1), 
+        (0, 1),
+        (1, 1),
+        (1, -1),
+        (-1, 1),
+        (-1, -1),
+    ]
+}
+
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Vector<T> {
     pub x: T,
     pub y: T,
 }
 
-#[allow(dead_code)]
-impl Vector<f32> {
-    pub fn new() -> Vector<f32> {
-        Vector { x: 0.0, y: 0.0 }
+impl<T: Default> Vector<T> {
+    pub fn new() -> Vector<T> {
+        Vector {
+            x: T::default(),
+            y: T::default(),
+        }
     }
+}
 
-    pub fn construct(x: f32, y: f32) -> Vector<f32> {
+impl<T> Vector<T> {
+    pub fn construct(x: T, y: T) -> Vector<T> {
         Vector { x, y }
     }
+}
 
+#[allow(dead_code)]
+impl Vector<isize> {
+    
+}
+
+#[allow(dead_code)]
+impl Vector<f32> {
     pub fn add(&mut self, x: f32, y: f32) {
         self.x += x;
         self.y += y;

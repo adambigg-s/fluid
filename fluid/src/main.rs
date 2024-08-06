@@ -27,7 +27,6 @@ async fn main() {
     let mut fluid: Fluid = Fluid::construct(&config);
     let mut state: State = State::new();
     let mut accesses: i128 = 0;
-
     state = state.rotate();
 
     println!("Grid Size: {}", fluid.x * fluid.y);
@@ -39,9 +38,9 @@ async fn main() {
     fluid.print_cli();
 
     loop {
-        clear_background(BLACK);
+        clear_background(Color::from_hex(0x000000));
 
-        fluid.display(true, false, false, 0.6, 1.0, 1, false, true);
+        fluid.display(true, true, false, 0.4, 0.7, 1, true, false);
 
         if state == State::Simulation {
             fluid.update_fluid(true, true, true);
@@ -53,10 +52,8 @@ async fn main() {
 
         if is_mouse_button_pressed(MouseButton::Left) {
             fluid.update_fluid(true, false, false);
-            accesses += config.iters as i128;
         } else if is_mouse_button_pressed(MouseButton::Right) {
             fluid.update_fluid(true, true, true);
-            accesses += config.iters as i128;
         }
 
         if is_key_down(KeyCode::W) {
@@ -77,13 +74,13 @@ async fn main() {
             20.0,
             RED,
         );
-        // draw_text(
-        //     &format!("FPS: {}", get_fps()),
-        //     30.0,
-        //     20.0,
-        //     20.0,
-        //     RED,
-        // );
+        draw_text(
+            &format!("FPS: {}", get_fps()),
+            30.0,
+            20.0,
+            20.0,
+            RED,
+        );
 
         next_frame().await;
         std::thread::sleep(Duration::from_millis(0));
