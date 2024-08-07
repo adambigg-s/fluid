@@ -3,6 +3,8 @@
 
 use crate::config;
 use crate::utils;
+use crate::clone;
+use crate::fluidapi;
 
 
 
@@ -11,7 +13,9 @@ use macroquad::prelude::*;
 
 
 use config::Config;
-use utils::{get_color_vec, get_directions, Vector};
+use utils::{get_color_vec, Vector};
+use clone::Duplicate;
+use fluidapi::Oo;
 
 
 
@@ -21,35 +25,22 @@ pub enum DiffEle {
     Fluid,
     Static,
     Source,
-    Match(Match),
-}
-
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub struct Match {
-    x: usize,
-    y: usize,
-    master: Vector<isize>,
-}
-
-impl Match {
-    pub fn construct(x: usize, y: usize, mx: isize, my: isize) -> Match {
-        let master: Vector<isize> = Vector::construct(mx, my);
-        Match { x, y, master }
-    }
+    Clone(Duplicate),
 }
 
 impl DiffEle {
+    #[allow(dead_code)]
     pub fn to_strslice(self) -> &'static str {
         match self {
-            DiffEle::Fluid    => "Fluid",
-            DiffEle::Static   => "Solid",
-            DiffEle::Source   => "Emitter",
-            DiffEle::Match(_) => "Match",
+            Self::Fluid    => "Fluid",
+            Self::Static   => "Solid",
+            Self::Source   => "Emitter",
+            Self::Clone(_) => "Match",
         }
     }
 
     pub fn is_fluid(&self) -> bool {
-        matches!(*self, Self::Fluid | Self::Match(_))
+        matches!(*self, Self::Fluid | Self::Clone(_))
     }
 
     pub fn is_static(&self) -> bool {
@@ -72,10 +63,13 @@ pub struct Fluid {
     pub overrelaxation: f32,
     pub iters: usize,
     pub delta_t: f32,
+    pub source_velocity: f32,
 
     pub cell_size: f32,
 
-    pub matches: Vec<Match>,
+    pub matches: Vec<Duplicate>,
+    pub statics: Vec<Vector<usize>>,
+    pub sources: Vec<Vector<usize>>,
 }
 
 impl Fluid {
@@ -94,10 +88,13 @@ impl Fluid {
             overrelaxation: config.overrelaxation,
             iters: config.iters,
             delta_t: config.delta_t,
+            source_velocity: config.source_velocity,
 
             cell_size: config.cell_size,
 
             matches: Vec::new(),
+            statics: Vec::new(),
+            sources: Vec::new(),
         }
     }
 
@@ -108,6 +105,8 @@ impl Fluid {
         self.nv = vec![vec![0.0; self.x]; self.y + 1];
         self.element = vec![vec![DiffEle::Fluid; self.x]; self.y];
         self.matches = Vec::new();
+        self.statics = Vec::new();
+        self.sources = Vec::new();
         self.assert_boundary_conditions();
     }
 
@@ -117,7 +116,8 @@ impl Fluid {
 
     pub fn assert_boundary_place(&mut self, x: usize, y: usize) {
         if self.inbounds(x, y) {
-            self.element[y][x] = DiffEle::Static;
+            let mut oo: Oo = Oo::construct(x, y, self);
+            oo.set_here(DiffEle::Static);
         }
     }
 
@@ -128,24 +128,41 @@ impl Fluid {
         }
     }
 
+    pub fn assert_static_velocity(&mut self) {
+        for stat in self.statics.clone() {
+            let mut oo: Oo = Oo::construct(stat.x, stat.y, self);
+            oo.set_velocity_zeros();
+        }
+    }
+
+    pub fn assert_source_velocity(&mut self) {
+        for sour in self.sources.clone() {
+            let mut oo: Oo = Oo::construct(sour.x, sour.y, self);
+            oo.set_velocity_polarized(oo.fluid.source_velocity, 0.0);
+        }
+        
+    }
+
     pub fn assert_boundary_conditions(&mut self) {
         for y in 0..self.y {
             for x in 0..self.x {
+                
                 let xx: usize = self.x;
                 let yy: usize = self.y;
                 let mut oo: Oo = Oo::construct(x, y, self);
-                if oo.fluid.element[y][x].is_static() {
+                
+                if oo.peek_element_here(0, 0).is_static() {
                     oo.set_velocity_zeros();
                 }
 
-                // if y == 0 || y == yy - 1 || x == 0 {
-                //     oo.set_here(DiffEle::Static);
-                //     oo.set_velocity_zeros();
-                // }
+                if y == 0 || y == yy - 1 || x == 0 {
+                    oo.set_here(DiffEle::Static);
+                    oo.set_velocity_zeros();
+                }
 
                 if x == 0 {
                     oo.set_here(DiffEle::Source);
-                    oo.set_velocity_polarized(60.0, 0.0);
+                    oo.set_velocity_polarized(oo.fluid.source_velocity, 0.0);
                 }
                 // if yy * 2 / 5 < y && y < yy * 3 / 5 && x == 0 {
                 //     oo.set_here(DiffEle::Source);
@@ -156,18 +173,22 @@ impl Fluid {
                 //     oo.set_velocity_polarized(45.0, 0.0);
                 // }
 
+                // if xx * 9 / 10 < x && x < xx && y == 0 {
+                //     let matched = Duplicate::construct(x, y, -1, 0);
+                //     oo.set_here(DiffEle::Clone(matched));
+                // }
                 if x == xx - 1 {
-                    let matched = Match::construct(x, y, -1, 0);
-                    oo.set_here(DiffEle::Match(matched));
+                    let matched = Duplicate::construct(x, y, -1, 0);
+                    oo.set_here(DiffEle::Clone(matched));
                 }
                 if y == 0 {
-                    let matched = Match::construct(x, y, 0, 1);
-                    oo.set_here(DiffEle::Match(matched));
+                    let matched = Duplicate::construct(x, y, 0, 1);
+                    oo.set_here(DiffEle::Clone(matched));
                 }
-                if y == yy-1 {
-                    let matched = Match::construct(x, y, 0, -1);
-                    oo.set_here(DiffEle::Match(matched));
-                }
+                // if y == yy-1 {
+                //     let matched = Duplicate::construct(x, y, 0, -1);
+                //     oo.set_here(DiffEle::Clone(matched));
+                // }
 
                 // let center_x = xx / 10;
                 // let center_y = yy / 2;
@@ -182,10 +203,14 @@ impl Fluid {
                 // if xx / 10 < x && x < xx * 2 / 10 && yy * 2 / 5 < y && y < yy * 3 / 5 {
                 //     oo.set_here(DiffEle::Static);
                 // }
+                if xx / 10 < x && x < xx * 2 / 10 && yy * 4 / 5 < y && y < yy {
+                    oo.set_here(DiffEle::Static);
+                }
             }
         }
     }
 
+    #[allow(dead_code)]
     pub fn print_cli(&self) {
         for y in 0..self.y {
             let mut line: String = String::new();
@@ -226,7 +251,7 @@ impl Fluid {
                     DiffEle::Fluid    => continue,
                     DiffEle::Static   => Color::from_hex(0x000000),
                     DiffEle::Source   => Color::from_hex(0x1b85b8),
-                    DiffEle::Match(_) => Color::from_hex(0x559e83),
+                    DiffEle::Clone(_) => Color::from_hex(0x559e83),
                 };
                 draw_rectangle(
                     x as f32 * self.cell_size,
@@ -237,7 +262,6 @@ impl Fluid {
                 );
             }
         }
-
         for y in 0..self.y {
             for x in 0..self.x {
                 if !draw_bounds && self.element[y][x] != DiffEle::Fluid {
@@ -254,7 +278,7 @@ impl Fluid {
                 velocity.add(0.0, oo.peek_velocity(0, 1));
                 velocity.add(0.0, oo.peek_velocity(0, -1));
 
-                let color: Color = get_color_vec(&velocity, 200.0);
+                let color: Color = get_color_vec(&velocity, oo.fluid.source_velocity);
 
                 if vector {
                     let nsize = self.cell_size * 2.5;
@@ -268,7 +292,6 @@ impl Fluid {
                         x: x as f32 * self.cell_size + self.cell_size / 2.0,
                         y: y as f32 * self.cell_size + self.cell_size / 2.0,
                     };
-
                     draw_line(
                         start.x,
                         start.y,
@@ -277,10 +300,12 @@ impl Fluid {
                         thickness,
                         color,
                     );
+                    
                     if head {
                         draw_circle(start.x + velocity.x, start.y + velocity.y, head_size, color);
                     }
-                } else if fill {
+                } 
+                else if fill {
                     let start: Vector<f32> = Vector {
                         x: x as f32 * self.cell_size,
                         y: y as f32 * self.cell_size,
@@ -300,14 +325,17 @@ impl Fluid {
             self.semi_lagrangian_advection();
         }
         if assert_bc {
-            self.assert_boundary_conditions();
+            self.assert_static_velocity();
+            self.assert_source_velocity();
         }
     }
 
     fn projection_gauss_seidel(&mut self) {
         for _ in 0..self.iters {
+            
             for y in 0..self.y {
                 for x in 0..self.x {
+                    
                     if self.element[y][x] != DiffEle::Fluid {
                         continue;
                     }
@@ -331,6 +359,7 @@ impl Fluid {
     fn semi_lagrangian_advection(&mut self) {
         for y in 0..self.y {
             for x in 0..self.x {
+                
                 if self.element[y][x] != DiffEle::Fluid {
                     continue;
                 }
@@ -351,135 +380,3 @@ impl Fluid {
     }
 }
 
-pub struct Oo<'a> {
-    pub x: usize,
-    pub y: usize,
-    pub fluid: &'a mut Fluid,
-}
-
-impl<'a> Oo<'a> {
-    pub fn construct(x: usize, y: usize, fluid: &'a mut Fluid) -> Oo {
-        Oo { x, y, fluid }
-    }
-
-    pub fn set_here(&mut self, cell: DiffEle) {
-        match cell {
-            DiffEle::Match(mat) => {
-                self.fluid.matches.push(mat);
-                self.fluid.element[self.y][self.x] = cell;
-            }
-            _                   => {
-                self.fluid.element[self.y][self.x] = cell;
-            }
-        }
-    }
-
-    pub fn peek_element_here(&self, dx: isize, dy: isize) -> DiffEle {
-        let (nx, ny): (usize, usize) = self.index(dx, dy);
-        if self.fluid.inbounds(nx, ny) {
-            self.fluid.element[ny][nx]
-        } else {
-            DiffEle::Static
-        }
-    }
-
-    pub fn peek_velocity(&self, dx: isize, dy: isize) -> f32 {
-        let (nx, ny): (usize, usize) = self.index(dx, dy);
-        match (dx, dy) {
-            (1, 0)  => self.fluid.u[self.y][nx],
-            (-1, 0) => self.fluid.u[self.y][self.x],
-            (0, 1)  => self.fluid.v[ny][self.x],
-            (0, -1) => self.fluid.v[self.y][self.x],
-            _       => {
-                eprintln!("OOB Error checking neighbor");
-                std::process::exit(1);
-            }
-        }
-    }
-
-    pub fn peek_velocity_mut(&mut self, dx: isize, dy: isize) -> &mut f32 {
-        let (nx, ny): (usize, usize) = self.index(dx, dy);
-        match (dx, dy) {
-            (1, 0)  => &mut self.fluid.u[self.y][nx],
-            (-1, 0) => &mut self.fluid.u[self.y][self.x],
-            (0, 1)  => &mut self.fluid.v[ny][self.x],
-            (0, -1) => &mut self.fluid.v[self.y][self.x],
-            _       => {
-                eprintln!("OOB Error fetching neighbor velocity reference");
-                std::process::exit(37);
-            }
-        }
-    }
-
-    pub fn divergence_here(&self) -> f32 {
-        self.peek_velocity(1, 0) 
-            - self.peek_velocity(-1, 0) 
-            + self.peek_velocity(0, 1)
-            - self.peek_velocity(0, -1)
-    }
-
-    pub fn modify_adjacent(&mut self, adjustment: f32) {
-        if self.peek_element_here(1, 0).is_fluid() {
-            *self.peek_velocity_mut(1, 0) += adjustment;
-        }
-        if self.peek_element_here(-1, 0).is_fluid() {
-            *self.peek_velocity_mut(-1, 0) += -adjustment;
-        }
-        if self.peek_element_here(0, 1).is_fluid() {
-            *self.peek_velocity_mut(0, 1) += adjustment;
-        }
-        if self.peek_element_here(0, -1).is_fluid() {
-            *self.peek_velocity_mut(0, -1) += -adjustment;
-        }
-    }
-
-    pub fn set_velocity_polarized(&mut self, set_x: f32, set_y: f32) {
-        *self.peek_velocity_mut(1, 0) = set_x;
-        *self.peek_velocity_mut(-1, 0) = set_x;
-        *self.peek_velocity_mut(0, 1) = set_y;
-        *self.peek_velocity_mut(0, -1) = set_y;
-    }
-
-    pub fn set_velocity_zeros(&mut self) {
-        *self.peek_velocity_mut(1, 0) = 0.0;
-        *self.peek_velocity_mut(-1, 0) = 0.0;
-        *self.peek_velocity_mut(0, 1) = 0.0;
-        *self.peek_velocity_mut(0, -1) = 0.0;
-    }
-
-    pub fn set_velocity_matched(&mut self, dref_x: isize, dref_y: isize) {
-        let (rx, ry) = self.index(dref_x, dref_y);
-        let v10: f32;
-        let vn0: f32;
-        let v01: f32;
-        let v0n: f32;
-        let damping = 1.0;
-        {
-            let refr = Oo::construct(rx, ry, self.fluid);
-            v10 = refr.peek_velocity(1, 0);
-            vn0 = refr.peek_velocity(-1, 0);
-            v01 = refr.peek_velocity(0, 1);
-            v0n = refr.peek_velocity(0, -1);
-        }
-        *self.peek_velocity_mut(1, 0) = v10 * damping;
-        *self.peek_velocity_mut(-1, 0) = vn0 * damping;
-        *self.peek_velocity_mut(0, 1) = v01 * damping;
-        *self.peek_velocity_mut(0, -1) = v0n * damping;
-    }
-
-    pub fn afflicted_area(&self) -> f32 {
-        let mut sides: f32 = 0.0;
-        for (dx, dy) in get_directions() {
-            if self.peek_element_here(dx, dy).is_fluid() {
-                sides += 1.0;
-            }
-        }
-        sides
-    }
-
-    fn index(&self, dx: isize, dy: isize) -> (usize, usize) {
-        let nx: usize = ((self.x as isize) + dx) as usize;
-        let ny: usize = ((self.y as isize) + dy) as usize;
-        (nx, ny)
-    }
-}

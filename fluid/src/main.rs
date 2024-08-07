@@ -4,6 +4,8 @@
 mod config;
 mod fluid;
 mod utils;
+mod clone;
+mod fluidapi;
 
 
 
@@ -12,7 +14,7 @@ use std::{env, time::Duration};
 
 
 
-use config::{configuration, Config, State};
+use config::{configuration, Config, State, VisualMode};
 use fluid::Fluid;
 
 
@@ -26,8 +28,7 @@ async fn main() {
     let config: Config = Config::new();
     let mut fluid: Fluid = Fluid::construct(&config);
     let mut state: State = State::new();
-    let mut accesses: i128 = 0;
-    state = state.rotate();
+    let mut display: VisualMode = VisualMode::new();
 
     println!("Grid Size: {}", fluid.x * fluid.y);
 
@@ -35,17 +36,28 @@ async fn main() {
     for _ in 0..15 {
         fluid.update_fluid(true, false, false);
     }
-    fluid.print_cli();
 
     loop {
         clear_background(Color::from_hex(0x000000));
 
-        fluid.display(true, true, false, 0.4, 0.7, 1, true, false);
+        match display {
+            VisualMode::Gradient => {
+                fluid.display(true, false, false, 0.4, 0.7, 1, false, true);
+            }
+            VisualMode::Vector   => {
+                fluid.display(true, false, false, 0.4, 0.7, 5, true, false);
+            }
+            VisualMode::Other    => {
+                fluid.display(true, false, true, 0.4, 0.8, 1, true, false);
+            }
+            VisualMode::Blank    => {}
+        } if is_key_pressed(KeyCode::V) {
+            display = display.rotate();
+        }
 
         if state == State::Simulation {
             fluid.update_fluid(true, true, true);
-            accesses += (fluid.iters * fluid.x * fluid.y) as i128;
-        }
+        } 
         if is_key_pressed(KeyCode::P) {
             state = state.rotate();
         }
@@ -67,13 +79,6 @@ async fn main() {
             fluid.reset();
         }
 
-        draw_text(
-            &format!("Matrix Accesses: {}", accesses),
-            30.0,
-            40.0,
-            20.0,
-            RED,
-        );
         draw_text(
             &format!("FPS: {}", get_fps()),
             30.0,
