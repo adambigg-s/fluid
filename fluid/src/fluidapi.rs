@@ -24,17 +24,17 @@ impl<'a> Oo<'a> {
 
     pub fn set_here(&mut self, cell: DiffEle) {
         self.fluid.element[self.y][self.x] = cell;
-        match cell {
-            DiffEle::Static     => {
-                self.fluid.statics.push(Vector::construct(self.x, self.y));
-            }
-            DiffEle::Source     => {
-                self.fluid.sources.push(Vector::construct(self.x, self.y));
-            }
-            DiffEle::Clone(mat) => {
-                self.fluid.matches.push(mat);
-            }
-            _                   => {}
+        if !self.fluid.boundaries.contains( &Vector::construct(self.x, self.y) ){
+            self.fluid.boundaries.push( Vector::construct(self.x, self.y) );
+        }
+    }
+
+    pub fn remove_here(&mut self) {
+        self.fluid.element[self.y][self.x] = DiffEle::Fluid;
+        if let Some(idx) = self.fluid.boundaries.iter().position(
+            |vec| *vec == Vector::construct(self.x, self.y)
+        ) {
+            self.fluid.boundaries.remove(idx);
         }
     }
 
@@ -98,16 +98,16 @@ impl<'a> Oo<'a> {
     }
 
     pub fn set_velocity_polarized(&mut self, set_x: f32, set_y: f32) {
-        *self.peek_velocity_mut(1, 0) = set_x;
+        *self.peek_velocity_mut(1, 0)  = set_x;
         *self.peek_velocity_mut(-1, 0) = set_x;
-        *self.peek_velocity_mut(0, 1) = set_y;
+        *self.peek_velocity_mut(0, 1)  = set_y;
         *self.peek_velocity_mut(0, -1) = set_y;
     }
 
     pub fn set_velocity_zeros(&mut self) {
-        *self.peek_velocity_mut(1, 0) = 0.0;
+        *self.peek_velocity_mut(1, 0)  = 0.0;
         *self.peek_velocity_mut(-1, 0) = 0.0;
-        *self.peek_velocity_mut(0, 1) = 0.0;
+        *self.peek_velocity_mut(0, 1)  = 0.0;
         *self.peek_velocity_mut(0, -1) = 0.0;
     }
 
@@ -125,9 +125,9 @@ impl<'a> Oo<'a> {
             v01 = refr.peek_velocity(0, 1);
             v0n = refr.peek_velocity(0, -1);
         }
-        *self.peek_velocity_mut(1, 0) = v10 * damping;
+        *self.peek_velocity_mut(1, 0)  = v10 * damping;
         *self.peek_velocity_mut(-1, 0) = vn0 * damping;
-        *self.peek_velocity_mut(0, 1) = v01 * damping;
+        *self.peek_velocity_mut(0, 1)  = v01 * damping;
         *self.peek_velocity_mut(0, -1) = v0n * damping;
     }
 

@@ -31,19 +31,19 @@ pub fn get_directions_8() -> [(isize, isize); 8] {
 #[allow(dead_code)]
 pub fn get_directions_26() -> [(isize, isize, isize); 26] {
     [
-        (1, 0, 0), (1, 1, 0), 
-        (1, -1, 0), (0, 1, 0), 
-        (0, -1, 0), (-1, 0, 0), 
-        (-1, 1, 0), (-1, -1, 0), 
-        (0, 0, 1), (0, 0, -1),
-        (1, 0, 1), (1, 0, -1), 
-        (1, 1, 1), (1, 1, -1), 
-        (1, -1, 1), (1, -1, -1), 
-        (-1, 0, 1), (-1, 0, -1), 
-        (-1, 1, 1), (-1, 1, -1),
+        (1 , 0 , 0), (1 , 1 , 0) , 
+        (1 , -1, 0), (0 , 1 , 0) , 
+        (0 , -1, 0), (-1, 0 , 0) , 
+        (-1, 1 , 0), (-1, -1, 0) , 
+        (0 , 0 , 1), (0 , 0 , -1),
+        (1 , 0 , 1), (1 , 0 , -1), 
+        (1 , 1 , 1), (1 , 1 , -1), 
+        (1 , -1, 1), (1 , -1, -1), 
+        (-1, 0 , 1), (-1, 0 , -1), 
+        (-1, 1 , 1), (-1, 1 , -1),
         (-1, -1, 1), (-1, -1, -1), 
-        (0, 1, 1), (0, 1, -1), 
-        (0, -1, 1), (0, -1, -1),
+        (0 , 1 , 1), (0 , 1 , -1), 
+        (0 , -1, 1), (0 , -1, -1),
     ]
 }
 
@@ -51,6 +51,16 @@ pub fn get_directions_26() -> [(isize, isize, isize); 26] {
 pub struct Vector<T> {
     pub x: T,
     pub y: T,
+}
+
+pub trait ToVector {
+    fn to_vector(&self) -> Vector<f32>;
+}
+
+impl ToVector for (f32, f32) {
+    fn to_vector(&self) -> Vector<f32> {
+        Vector::construct(self.0, self.1)
+    }
 }
 
 impl<T: Default> Vector<T> {
@@ -93,8 +103,7 @@ impl Vector<f32> {
     }
 }
 
-pub fn get_color_vec(vec:&Vector<f32>, max: f32) -> Color {
-    let buffer_mult: f32 = 3.5;
+pub fn get_color_vec(vec:&Vector<f32>, max: f32, buffer_mult: f32) -> Color {
     let max = max * buffer_mult;
     
     let mag = vec.magnitude();
@@ -121,7 +130,7 @@ fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
         180..=239 => (0.0, x, c),
         240..=299 => (x, 0.0, c),
         300..=359 => (c, 0.0, x),
-        _         => (0.0, 0.0, 0.0),
+        _         => (1.0, 1.0, 1.0),
     };
 
     (
@@ -129,6 +138,31 @@ fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
         ((g + m) * 255.0) as u8,
         ((b + m) * 255.0) as u8,
     )
+}
+
+pub fn interpolate_f32(prev: Vector<f32>, curr: Vector<f32>) -> Vec<Vector<f32>> {
+    let dx = prev.x - curr.x;
+    let dy = prev.y - curr.y;
+    let distance = Vector::construct(dx, dy).magnitude();
+    let steps = distance as usize;
+    let mut points = Vec::new();
+
+    if steps < 1 {
+        points.push(prev);
+        return points;
+    }
+
+    for i in 0..=steps {
+        let t = (i as f32) / distance;
+        points.push(
+            Vector::construct(
+                prev.x + t * dx,
+                prev.y + t * dy,
+            )
+        );
+    }
+
+    points
 }
 
 
@@ -306,4 +340,69 @@ pub fn get_color_vec(vec: &Vector<f32>, max: f32) -> Color {
     Color::from_rgba(r, g, b, 200)
 }
 
+        if is_key_down(KeyCode::W) {
+            let (x, y) = mouse_position();
+            let (x, y) = (
+                (x / fluid.cell_size) as usize,
+                (y / fluid.cell_size) as usize,
+            );
+            fluid.assert_boundary_place(x, y);
+        } 
+        
+    // pub fn assert_static_velocity(&mut self) {
+    //     for stat in self.statics.clone() {
+    //         let mut oo: Oo = Oo::construct(stat.x, stat.y, self);
+    //         oo.set_velocity_zeros();
+    //     }
+    // }
+
+    // pub fn assert_source_velocity(&mut self) {
+    //     for sour in self.sources.clone() {
+    //         let mut oo: Oo = Oo::construct(sour.x, sour.y, self);
+    //         oo.set_velocity_polarized(oo.fluid.source_velocity, 0.0);
+    //     }
+    // }
+
+    fn semi_lagrangian_advection_depricated(&mut self) {
+        for y in 0..self.y {
+            for x in 0..self.x {
+                
+                if self.element[y][x] != DiffEle::Fluid {
+                    continue;
+                }
+
+                let prev_x =
+                    (x as f32 - self.u[y][x] * self.delta_t / self.grid_size).round() as usize;
+                let prev_y =
+                    (y as f32 - self.v[y][x] * self.delta_t / self.grid_size).round() as usize;
+
+                if self.inbounds(prev_x, prev_y) {
+                    self.nu[y][x] = self.u[prev_y][prev_x];
+                    self.nv[y][x] = self.v[prev_y][prev_x];
+                }
+            }
+        }
+        self.u.clone_from(&self.nu);
+        self.v.clone_from(&self.nv);
+    }
+    
+    fn double_lin_int_depricated(&self, x: f32, y: f32, field: &str) -> f32 {
+        let field = match field {
+            "u" => &self.u,
+            "v" => &self.v,
+            _   => {
+                eprintln!("Error in field token");
+                std::process::exit(99);
+            }
+        };
+
+        let x = x.round() as usize;
+        let y = y.round() as usize;
+
+        let x = x.clamp(0, self.x-1);
+        let y = y.clamp(0, self.y-1);
+
+        field[y][x]
+    }
+    
 */
