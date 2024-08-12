@@ -10,28 +10,37 @@ use crate::fluidapi;
 
 
 use macroquad::prelude::*;
+use std::arch;
 
 
 
 use config::Config;
-use utils::{get_color_vec, Vector};
+use utils::{get_color_vec, Vector, get_directions};
 use clone::Clone;
 use source::Source;
 use fluidapi::Oo;
 
 
 
+/// union enum used to store state of grid's contained elements
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(dead_code)]
-pub enum DiffEle {
+pub enum Ele {
+    /// Fluid is used to carry no additional information and is subject to all state changes
     Fluid,
+    /// Static boundary maintains zero flux and asserts the presence of strictly tangential velocity.
+    /// presence of Static implies with a wall or solid object 
     Static,
+    /// Source holds a struct storing maintained velocity. this can be used to effectively set in/out-flow
+    /// velocity at a controlled rate 
     Source(Source),
+    /// Clone holds a struct carring relative indexing information pointing towards a cell to clone state.
+    /// this effectively allows the effect of extending bounds indefinitely. 
     Clone(Clone),
 }
 
 
-impl DiffEle {
+impl Ele {
     #[allow(dead_code)]
     pub fn to_strslice(self) -> &'static str {
         match self {
@@ -42,6 +51,8 @@ impl DiffEle {
         }
     }
 
+    /// returns true for Fluid and Clone - both of these cells are subject to effective divergence and 
+    /// must be taken into account for calculations 
     pub fn is_fluid(&self) -> bool {
         matches!(*self, Self::Fluid | Self::Clone(_))
     }
@@ -62,7 +73,7 @@ pub struct Fluid {
     pub nv: Vec<Vec<f32>>,
     pub vorticity: Vec<Vec<f32>>,
 
-    pub element: Vec<Vec<DiffEle>>,
+    pub element: Vec<Vec<Ele>>,
 
     pub overrelaxation: f32,
     pub iters: usize,
@@ -89,7 +100,7 @@ impl Fluid {
             nv: vec![vec![0.0; config.x]; config.y + 1],
             vorticity: vec![vec![0.0; config.x]; config.y],
 
-            element: vec![vec![DiffEle::Fluid; config.x]; config.y],
+            element: vec![vec![Ele::Fluid; config.x]; config.y],
 
             overrelaxation: config.overrelaxation,
             iters: config.iters,
@@ -110,19 +121,47 @@ impl Fluid {
         self.v = vec![vec![0.0; self.x]; self.y + 1];
         self.nu = vec![vec![0.0; self.x + 1]; self.y];
         self.nv = vec![vec![0.0; self.x]; self.y + 1];
-        self.element = vec![vec![DiffEle::Fluid; self.x]; self.y];
+        self.element = vec![vec![Ele::Fluid; self.x]; self.y];
         self.boundaries = Vec::new();
         self.assert_boundary_conditions();
     }
 
+    #[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
+    #[cfg(target_arch = "x86_64")]
+    pub fn inbounds(&self, x: usize, y: usize) -> bool {
+        let result: u8;
+        unsafe {
+            arch::asm!(
+                "cmp {x}, {bx}",
+                "jae 1f",
+                "cmp {y}, {by}",
+                "jae 1f",
+                "mov {result}, 1",
+                "jmp 2f",
+                "1:",
+                "mov {result}, 0",
+                "2:",
+                x = in(reg) x,
+                y = in(reg) y,
+                bx = in(reg) self.x,
+                by = in(reg) self.y,
+                result = out(reg_byte) result,
+                options(nostack, nomem, preserves_flags),
+            );
+        }
+
+        result != 0
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
     pub fn inbounds(&self, x: usize, y: usize) -> bool {
         x < self.x && y < self.y
     }
-
+    
     pub fn assert_boundary_place(&mut self, x: usize, y: usize) {
         if self.inbounds(x, y) {
             let mut oo: Oo = Oo::construct(x, y, self);
-            oo.set_here(DiffEle::Static);
+            oo.set_here(Ele::Static);
         }
     }
 
@@ -134,62 +173,99 @@ impl Fluid {
     }
 
     pub fn assert_boundary_conditions(&mut self) {
-        for y in 0..self.y {
-            for x in 0..self.x {
-                
-                let xx: usize = self.x;
-                let yy: usize = self.y;
-                let mut oo: Oo = Oo::construct(x, y, self);
-                
-                // if y == 0 || y == yy - 1  {
-                //     oo.set_here(DiffEle::Static);
-                //     oo.set_velocity_zeros();
-                // }
+        let _xx = self.x;
+        let _yy = self.y;
 
-                if x == 0 {
-                    let source = Source::construct(oo.fluid.source_velocity, 0.0);
-                    oo.set_here(DiffEle::Source(source));
-                }
+        // assert maintainable boundary conditions on 4 sides
+        self.fill_left_border(Ele::Source(Source::construct(self.source_velocity, 0.0)));
+        self.fill_right_border(Ele::Clone(Clone::construct(-1, 0)));
+        self.fill_top_border(Ele::Static);
+        self.fill_bot_border(Ele::Static);
 
-                if x == xx-1 {
-                    let cloned = Clone::construct(-1, 0);
-                    oo.set_here(DiffEle::Clone(cloned));
-                }
+        // add standard geometry
 
-                if y == 0 {
-                    let cloned = Clone::construct(0, 1);
-                    oo.set_here(DiffEle::Clone(cloned));
-                }
-
-                if y == yy-1 {
-                    let cloned = Clone::construct(0, -1);
-                    oo.set_here(DiffEle::Clone(cloned));
-                }
-                // if y == yy-1 {
-                //     oo.set_here(DiffEle::Static);
-                // }
-
-                let center_x = xx / 10;
-                let center_y = yy / 2;
-                let radius = (std::cmp::min(xx, yy) as f32).sqrt() - 3.0;
-                if (x as f32 - center_x as f32).powf(2.0) + (y as f32 - center_y as f32).powf(2.0) 
-                    < radius * radius 
-                {
-                    oo.set_here(DiffEle::Static);
-                    oo.set_velocity_zeros();
-                }
-
-                // if xx / 10 < x && x < xx * 2 / 10 && yy * 2 / 5 < y && y < yy * 3 / 5 {
-                //     oo.set_here(DiffEle::Static);
-                // }
-                // if xx * 3 / 10 < x && x < xx * 4 / 10 && yy * 4 / 5 < y && y < yy {
-                //     oo.set_here(DiffEle::Static);
-                // }
-            }
-        }
+        // apply boundary conditions to all elements initalized 
         self.enforce_boundary_conditions();
     }
 
+    #[allow(dead_code)]
+    fn crate_circle(&mut self, center_x: usize, center_y: usize, radius: f32) {
+        for y in 0..self.y {
+            for x in 0..self.x {
+                if (x as f32 - center_x as f32).powf(2.0) 
+                    + (y as f32 - center_y as f32).powf(2.0) 
+                    < radius.powf(2.0) 
+                {
+                    let mut oo = Oo::construct(x, y, self);
+                    oo.set_here(Ele::Static);
+                }
+            }
+        }
+    }
+
+    #[allow(dead_code)]
+    fn create_rectangle(&mut self, x0: usize, y0: usize, x1: usize, y1: usize) {
+        for y in y0..y1 {
+            for x in x0..x1 {
+                let mut oo = Oo::construct(x, y, self);
+                oo.set_here(Ele::Static);
+            }
+        }
+    }
+
+    fn fill_top_border(&mut self, fill: Ele) {
+        for x in 0..self.x {
+            let mut oo = Oo::construct(x, 0, self);
+            oo.set_here(fill);
+        }
+    }
+
+    fn fill_bot_border(&mut self, fill: Ele) {
+        for x in 0..self.x {
+            let mut oo = Oo::construct(x, self.y-1, self);
+            oo.set_here(fill);
+        }
+    }
+
+    fn fill_right_border(&mut self, fill: Ele) {
+        for y in 0..self.y {
+            let mut oo = Oo::construct(self.x-1, y, self);
+            oo.set_here(fill);
+        }
+    }
+
+    fn fill_left_border(&mut self, fill: Ele) {
+        for y in 0..self.y {
+            let mut oo = Oo::construct(0, y, self);
+            oo.set_here(fill);
+        }
+    }
+
+    pub fn fill_dfs(&mut self, x: usize, y: usize) {
+        let mut stack = vec![(x, y)];
+        let mut seen = vec![vec![false; self.x]; self.y];
+
+        while let Some((x, y)) = stack.pop() {
+            if self.element[y][x] == Ele::Static || seen[y][x] {
+                continue;
+            }
+
+            seen[y][x] = true;
+            // explicitly changes element matrix without using Oo wrapper api. this is intentional and desired 
+            // desired behavior becuase we can operate with the assumption that a fill algorithm will never 
+            // make meaninful impact on outer bcs via stokes
+            self.element[y][x] = Ele::Static;
+
+            for (dx, dy) in get_directions() {
+                let nx = (x as isize + dx) as usize;
+                let ny = (y as isize + dy) as usize;
+                if nx< self.x && ny < self.y && !seen[ny][nx] {
+                    stack.push((nx, ny));
+                }
+            }
+        }
+    }
+    
     #[allow(dead_code)]
     pub fn print_cli(&self) {
         for y in 0..self.y {
@@ -228,10 +304,10 @@ impl Fluid {
         for y in 0..self.y {
             for x in 0..self.x {
                 let color: Color = match self.element[y][x] {
-                    DiffEle::Fluid     => continue,
-                    DiffEle::Static    => Color::from_hex(0x000000),
-                    DiffEle::Source(_) => Color::from_hex(0x1b85b8),
-                    DiffEle::Clone(_)  => Color::from_hex(0x559e83),
+                    Ele::Fluid     => continue,
+                    Ele::Static    => Color::from_hex(0x000000),
+                    Ele::Source(_) => Color::from_hex(0x1b85b8),
+                    Ele::Clone(_)  => Color::from_hex(0x559e83),
                 };
                 draw_rectangle(
                     x as f32 * self.cell_size,
@@ -244,7 +320,7 @@ impl Fluid {
         }
         for y in 0..self.y {
             for x in 0..self.x {
-                if !draw_bounds && self.element[y][x] != DiffEle::Fluid {
+                if !draw_bounds && self.element[y][x] != Ele::Fluid {
                     continue;
                 }
                 if x % spacing != 0 || y % spacing != 0 {
@@ -321,7 +397,7 @@ impl Fluid {
             for y in 0..self.y {
                 for x in 0..self.x {
                     
-                    if self.element[y][x] != DiffEle::Fluid {
+                    if self.element[y][x] != Ele::Fluid {
                         continue;
                     }
 
@@ -467,13 +543,13 @@ impl Fluid {
         for position in self.boundaries.clone() {
             let mut oo: Oo = Oo::construct(position.x, position.y, self);
             match oo.peek_element_here(0, 0) {
-                DiffEle::Static       => {
+                Ele::Static       => {
                     oo.set_velocity_zeros();
                 }
-                DiffEle::Source(sour) => {
+                Ele::Source(sour) => {
                     oo.set_velocity_polarized(sour.velocity.x, sour.velocity.y);
                 }
-                DiffEle::Clone(clo)   => {
+                Ele::Clone(clo)   => {
                     oo.set_velocity_matched(clo.master.x, clo.master.y);
                 }
                 _                     => {}

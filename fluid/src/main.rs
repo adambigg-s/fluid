@@ -47,7 +47,7 @@ async fn main() {
         fluid.update_fluid(true, false, false, false);
     }
 
-    // starts look for update-draw cycle
+    // starts loop for update-draw cycle
     loop {
         clear_background(Color::from_hex(0x000000));
 
@@ -66,6 +66,12 @@ async fn main() {
             VisualMode::Blank    => {}
         } if is_key_pressed(KeyCode::V) {
             display = display.rotate();
+        }
+
+        if is_key_pressed(KeyCode::Key6) {
+            fluid.visual_modifier = 0.0_f32.max(fluid.visual_modifier - 0.1);
+        } else if is_key_pressed(KeyCode::Key7) {
+            fluid.visual_modifier = 100.0_f32.min(fluid.visual_modifier + 0.1);
         }
 
         // passes time on sim
@@ -105,6 +111,11 @@ async fn main() {
                 (x / fluid.cell_size) as usize, 
                 (y / fluid.cell_size) as usize,
             );
+        }
+
+        if is_key_down(KeyCode::W) && is_key_down(KeyCode::F) {
+            let (x, y) = mouse_position();
+            fluid.fill_dfs((x / fluid.cell_size) as usize, (y / fluid.cell_size) as usize);
         }
 
         if is_key_pressed(KeyCode::R) {

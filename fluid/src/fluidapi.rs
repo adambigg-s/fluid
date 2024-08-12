@@ -6,14 +6,29 @@ use crate::utils;
 
 
 
-use fluid::{DiffEle, Fluid};
+use std::arch;
+
+
+
+use fluid::{Ele, Fluid};
 use utils::{get_directions, Vector};
 
 
 
+/// represents a coordinate in the cartesian fluid grid along with a mutable reference to the fluid struct 
+///
+/// the Oo struct is used to safely interact with the staggered fluid grids a specific (x, y) coordinate
+/// and their adjacent cells. this wrapper struct provides methods to modify the fluid and it's properties
+/// without having to deal with remembering the conventions for the relative indexing of a staggered grid
+/// allocation of velocites
 pub struct Oo<'a> {
+    /// the x coordinate of the cell in the fluid grid
     pub x: usize,
+    
+    /// the y coordinate of the cell in the fluid grid
     pub y: usize,
+
+    /// a mutable reference to the Fluid struct allowing modifaction and reading of data by Oo 
     pub fluid: &'a mut Fluid,
 }
 
@@ -22,7 +37,7 @@ impl<'a> Oo<'a> {
         Oo { x, y, fluid }
     }
 
-    pub fn set_here(&mut self, cell: DiffEle) {
+    pub fn set_here(&mut self, cell: Ele) {
         self.fluid.element[self.y][self.x] = cell;
         if !self.fluid.boundaries.contains( &Vector::construct(self.x, self.y) ){
             self.fluid.boundaries.push( Vector::construct(self.x, self.y) );
@@ -30,7 +45,7 @@ impl<'a> Oo<'a> {
     }
 
     pub fn remove_here(&mut self) {
-        self.fluid.element[self.y][self.x] = DiffEle::Fluid;
+        self.fluid.element[self.y][self.x] = Ele::Fluid;
         if let Some(idx) = self.fluid.boundaries.iter().position(
             |vec| *vec == Vector::construct(self.x, self.y)
         ) {
@@ -38,12 +53,12 @@ impl<'a> Oo<'a> {
         }
     }
 
-    pub fn peek_element_here(&self, dx: isize, dy: isize) -> DiffEle {
+    pub fn peek_element_here(&self, dx: isize, dy: isize) -> Ele {
         let (nx, ny): (usize, usize) = self.index(dx, dy);
         if self.fluid.inbounds(nx, ny) {
             self.fluid.element[ny][nx]
         } else {
-            DiffEle::Static
+            Ele::Static
         }
     }
 
@@ -141,7 +156,39 @@ impl<'a> Oo<'a> {
         sides
     }
 
-    fn index(&self, dx: isize, dy: isize) -> (usize, usize) {
+    #[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
+    #[cfg(target_arch = "x86_64")]
+    pub fn index(&self, dx: isize, dy: isize) -> (usize, usize) {
+        let nx: usize;
+        let ny: usize;
+
+        unsafe {
+            arch::asm!(
+                "mov {tx}, {x}",
+                "add {tx}, {dx}",
+                "mov {nx}, {tx}",
+                
+                "mov {ty}, {y}",
+                "add {ty}, {dy}",
+                "mov {ny}, {ty}",
+
+                tx = out(reg) _,
+                ty = out(reg) _,
+                nx = out(reg) nx,
+                ny = out(reg) ny,
+                x = in(reg) self.x as isize,
+                y = in (reg) self.y as isize,
+                dx = in(reg) dx,
+                dy = in(reg) dy,
+                options(nostack, nomem),
+            );
+        }
+
+        (nx, ny)
+    }
+    
+    #[cfg(not(target_arch = "x86_64"))]
+    pub fn index(&self, dx: isize, dy: isize) -> (usize, usize) {
         let nx: usize = ((self.x as isize) + dx) as usize;
         let ny: usize = ((self.y as isize) + dy) as usize;
         (nx, ny)

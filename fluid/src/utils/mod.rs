@@ -5,6 +5,7 @@ use macroquad::prelude::*;
 
 
 
+/// 4 directions adjacent to a cell on a cartesian grid
 pub fn get_directions() -> [(isize, isize); 4] {
     [
         (-1, 0), 
@@ -14,6 +15,9 @@ pub fn get_directions() -> [(isize, isize); 4] {
     ]
 }
 
+/// 8 directions adjacent to a cell on a cartesian grid 
+/// differs from get_directions() by the addition of corner cells 
+/// with no actual direct contact with master cell 
 #[allow(dead_code)]
 pub fn get_directions_8() -> [(isize, isize); 8] {
     [
@@ -28,6 +32,8 @@ pub fn get_directions_8() -> [(isize, isize); 8] {
     ]
 }
 
+/// returns all adjacent cell's relative indicies in a 3d cartesian
+/// grid including corner cells with no direct flux into master
 #[allow(dead_code)]
 pub fn get_directions_26() -> [(isize, isize, isize); 26] {
     [
@@ -45,6 +51,54 @@ pub fn get_directions_26() -> [(isize, isize, isize); 26] {
         (0 , 1 , 1), (0 , 1 , -1), 
         (0 , -1, 1), (0 , -1, -1),
     ]
+}
+
+#[allow(dead_code)]
+pub trait Clamp {
+    fn clamped(&self, min: Self, max: Self) -> Self;
+}
+
+impl Clamp for f32 {
+    #[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
+    #[cfg(target_arch = "x86_64")]
+    fn clamped(&self, min: f32, max: f32) -> f32 {
+        let value: f32 = *self;
+        let result: f32;
+
+        unsafe {
+            std::arch::asm!(
+                "movss xmm0, {value}",
+                "movss xmm1, {min}",
+                "movss xmm2, {max}",
+                
+                "maxss xmm0, xmm1",
+                
+                "minss xmm0, xmm2",
+                
+                "movss {result}, xmm0",
+
+                value = in(xmm_reg) value,
+                min = in(xmm_reg) min,
+                max = in(xmm_reg) max,
+                result = out(xmm_reg) result,
+                options(nostack),
+            );
+        }
+
+        result
+    }
+    
+    #[cfg(not(target_arch = "x86_64"))]
+    fn clamped(&self, min: f32, max: f32) -> f32{
+        assert!(min <= max);
+        if self < &min {
+            min
+        } else if self > &max {
+            max
+        } else {
+            *self
+        }
+    }
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -110,7 +164,13 @@ pub fn get_color_vec(vec:&Vector<f32>, max: f32, buffer_mult: f32) -> Color {
     let clamped = mag.clamp(0.0, max);
     let norm_mag = clamped / max;
 
-    let hue = norm_mag * 360.0;
+    // currently magic number -- scaled_norm_mag adjusts the hue curve, with a higher power giving 
+    // more resolution to lower velocities and a lower power (especially < 1.0) giving a much more 
+    // dynamic colorization to higher velocitys. eventually this needs to be automated for sim conditions
+    let scaled_norm_mag = norm_mag.powf(1.6);
+
+    // color scheme can be inverted easily by changing to <scaled_norm_mag * 360.0>
+    let hue = 360.0 - (scaled_norm_mag * 360.0);
     let saturation = 1.0;
     let value = 1.0;
     let (r, g, b) = hsv_to_rgb(hue, saturation, value);
@@ -404,5 +464,5 @@ pub fn get_color_vec(vec: &Vector<f32>, max: f32) -> Color {
 
         field[y][x]
     }
-    
+
 */

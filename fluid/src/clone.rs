@@ -9,6 +9,9 @@ use utils::Vector;
 
 
 
+/// used to define border bcs which directly mirror an adjacent cell. this can be used 
+/// to the effect of extending simultaion bounds indefinitely with minimal performance 
+/// hit 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Clone {
     pub master: Vector<isize>,
