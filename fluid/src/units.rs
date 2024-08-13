@@ -47,10 +47,6 @@ trait MeterUnit {}
 trait SecondUnit {}
 trait NewtonUnit {}
 
-// struct Meter;
-// struct Second;
-// struct Newton;
-
 impl MeterUnit for Meter {}
 impl SecondUnit for Second {}
 impl NewtonUnit for Newton {}

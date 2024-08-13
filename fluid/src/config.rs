@@ -5,26 +5,20 @@ use macroquad::prelude::*;
 
 
 
-// static WIDTH: usize = 60;
-// static HEIGHT: usize = 20;
-// static CELL_SIZE: f32 = 35.0;
-static WIDTH: usize = 60 * 7;
-static HEIGHT: usize = 20 * 7;
-static CELL_SIZE: f32 = 35.0 / 7.0;
-// static WIDTH: usize = 60 * 10;
-// static HEIGHT: usize = 20 * 10;
-// static CELL_SIZE: f32 = 35.0 / 10.0;
-// static WIDTH: usize = 60 * 30;
-// static HEIGHT: usize = 20 * 30;
-// static CELL_SIZE: f32 = 35.0 / 30.0;
+static SCALE_FACTOR: usize = 7;
+static WIDTH: usize = 60 * SCALE_FACTOR;
+static HEIGHT: usize = 20 * SCALE_FACTOR;
+static CELL_SIZE: f32 = 35.0 / (SCALE_FACTOR as f32);
 static OVERRELAXATION: f32 = 1.97;
-static ITERS: usize = 100;
-static DELTA_T: f32 = 0.4;
-static SOURCE_V: f32 = 100.0;
-static VISUAL_MOD: f32 = 4.0;
+static ITERS: usize = 135;
+static DELTA_T: f32 = 0.2;
+static SOURCE_V: f32 = 70.0;
+static VISUAL_MOD: f32 = 2.0;
 static GRID_SIZE: f32 = 5.0;
-static VORT_CONF_EPSILON: f32 = 0.2;
+static VORT_CONF_EPSILON: f32 = 0.3;
 
+/// used to pass all simulation configuration information from <config> module into main to 
+/// construct fluid
 pub struct Config {
     pub x: usize,
     pub y: usize,

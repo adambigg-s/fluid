@@ -37,6 +37,7 @@ impl<'a> Oo<'a> {
         Oo { x, y, fluid }
     }
 
+    /// places an Ele at the current Oo's location 
     pub fn set_here(&mut self, cell: Ele) {
         self.fluid.element[self.y][self.x] = cell;
         if !self.fluid.boundaries.contains( &Vector::construct(self.x, self.y) ){
@@ -44,6 +45,7 @@ impl<'a> Oo<'a> {
         }
     }
 
+    /// reverts the current cell back to Fluid
     pub fn remove_here(&mut self) {
         self.fluid.element[self.y][self.x] = Ele::Fluid;
         if let Some(idx) = self.fluid.boundaries.iter().position(
@@ -53,6 +55,10 @@ impl<'a> Oo<'a> {
         }
     }
 
+    /// returns the Ele type of the the selected grid cell, able to see anywhere
+    /// in the fluid grid.  this function is called with relative indexing, and
+    /// will return the a solid Static boundary if attempted to peek into a cell
+    /// that is out of bounds
     pub fn peek_element_here(&self, dx: isize, dy: isize) -> Ele {
         let (nx, ny): (usize, usize) = self.index(dx, dy);
         if self.fluid.inbounds(nx, ny) {
@@ -76,6 +82,8 @@ impl<'a> Oo<'a> {
         }
     }
 
+    /// operates fundamentally in the same way as <peek_velocity()> but instead
+    /// returns a mutable reference to the specific cell's velocity
     pub fn peek_velocity_mut(&mut self, dx: isize, dy: isize) -> &mut f32 {
         let (nx, ny): (usize, usize) = self.index(dx, dy);
         match (dx, dy) {
@@ -156,6 +164,9 @@ impl<'a> Oo<'a> {
         sides
     }
 
+    /// simply converts relative coordinates into valid, absolute indicies in
+    /// the fluid's grid. this function gets called a lot of times, so it is 
+    /// converted into x86 to ensure it's quick quick
     #[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
     #[cfg(target_arch = "x86_64")]
     pub fn index(&self, dx: isize, dy: isize) -> (usize, usize) {

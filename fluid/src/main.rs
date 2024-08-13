@@ -8,6 +8,7 @@ mod clone;
 mod source;
 mod fluidapi;
 mod units;
+mod legacy;
 
 
 
@@ -18,19 +19,16 @@ use std::{env, time::Duration};
 
 use config::{configuration, Config, State, VisualMode};
 use fluid::Fluid;
-use utils::{Vector, interpolate_f32, ToVector};
+use utils::{Vector, place_tool};
 
 
 
 #[macroquad::main(configuration)]
 async fn main() {
-    println!("Hello, fluids!");
-
     // used for debugging and backtracing panics
     env::set_var("RUST_BACKTRACE", "full");
     env::set_var("CARGO_PROFILE_RELEASE_DEBUG", "true");
 
-    // initializes all vars to be used for main operating
     let config: Config = Config::new();
     let mut fluid: Fluid = Fluid::construct(&config);
     let mut state: State = State::new();
@@ -91,33 +89,24 @@ async fn main() {
             fluid.update_fluid(false, false, true, false);
         }
 
-        // used to place static bounds on grid
+        // used to sort of "draw" boundaries 
         if is_key_down(KeyCode::W) {
-            let now = mouse_position().to_vector();
-            if let Some(prev) = p_mouse {
-                let points = interpolate_f32(prev, now);
-                for point in points {
-                    fluid.assert_boundary_place(
-                        (point.x / fluid.cell_size) as usize, 
-                        (point.y / fluid.cell_size) as usize,
-                    );
-                }
-            }
-            p_mouse = Some(now);
-        } else { p_mouse = None; }
-        if is_key_down(KeyCode::D) {
-            let (x, y) = mouse_position();
-            fluid.assert_boundary_delete(
-                (x / fluid.cell_size) as usize, 
-                (y / fluid.cell_size) as usize,
-            );
+            place_tool(&mut p_mouse, &mut fluid, "place");
+        } else if is_key_down(KeyCode::D) {
+            place_tool(&mut p_mouse, &mut fluid, "delete");
+        } else {
+            p_mouse = None;
         }
 
         if is_key_down(KeyCode::W) && is_key_down(KeyCode::F) {
             let (x, y) = mouse_position();
-            fluid.fill_dfs((x / fluid.cell_size) as usize, (y / fluid.cell_size) as usize);
+            fluid.fill_dfs(
+                (x / fluid.cell_size) as usize, 
+                (y / fluid.cell_size) as usize
+            );
         }
 
+        // resets all placed boundaries and current fluid state 
         if is_key_pressed(KeyCode::R) {
             fluid.reset();
         }
