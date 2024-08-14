@@ -187,10 +187,10 @@ impl<'a> Oo<'a> {
                 ty = out(reg) _,
                 nx = out(reg) nx,
                 ny = out(reg) ny,
-                x = in(reg) self.x as isize,
-                y = in (reg) self.y as isize,
-                dx = in(reg) dx,
-                dy = in(reg) dy,
+                x  = in(reg)  self.x as isize,
+                y  = in(reg)  self.y as isize,
+                dx = in(reg)  dx,
+                dy = in(reg)  dy,
                 options(nostack, nomem),
             );
         }

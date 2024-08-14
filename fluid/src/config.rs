@@ -5,16 +5,16 @@ use macroquad::prelude::*;
 
 
 
-static SCALE_FACTOR: usize = 7;
+static SCALE_FACTOR: usize = 3;
 static WIDTH: usize = 60 * SCALE_FACTOR;
 static HEIGHT: usize = 20 * SCALE_FACTOR;
 static CELL_SIZE: f32 = 35.0 / (SCALE_FACTOR as f32);
 static OVERRELAXATION: f32 = 1.97;
 static ITERS: usize = 135;
-static DELTA_T: f32 = 0.2;
+static DELTA_T: f32 = 0.25;
 static SOURCE_V: f32 = 70.0;
 static VISUAL_MOD: f32 = 2.0;
-static GRID_SIZE: f32 = 5.0;
+static GRID_SIZE: f32 = 4.0;
 static VORT_CONF_EPSILON: f32 = 0.3;
 
 /// used to pass all simulation configuration information from <config> module into main to 
@@ -84,6 +84,7 @@ pub enum VisualMode {
     Gradient,
     Vector,
     Other,
+    Streamline,
     Blank,
 }
 
@@ -95,10 +96,11 @@ impl VisualMode {
 
     pub fn rotate(&self) -> VisualMode {
         match self {
-            Self::Gradient => Self::Vector,
-            Self::Vector   => Self::Other,
-            Self::Other    => Self::Blank,
-            Self::Blank    => Self::Gradient,
+            Self::Gradient   => Self::Vector,
+            Self::Vector     => Self::Other,
+            Self::Other      => Self::Streamline,
+            Self::Streamline => Self::Blank,
+            Self::Blank      => Self::Gradient,
         }
     }
 }

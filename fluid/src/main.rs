@@ -47,21 +47,26 @@ async fn main() {
 
     // starts loop for update-draw cycle
     loop {
-        clear_background(Color::from_hex(0x000000));
+        clear_background(Color::from_hex(0x121212));
 
         // visual enum used to select different visuals. blank mode is used to remove draw-loop overhead
         // and to allow faster iterations for long running sims
         match display {
-            VisualMode::Gradient => {
+            VisualMode::Gradient   => {
                 fluid.display(true, false, false, 0.4, 0.7, 1, false, true);
             }
-            VisualMode::Vector   => {
+            VisualMode::Vector     => {
                 fluid.display(true, true, false, 0.4, 0.7, 1, true, false);
             }
-            VisualMode::Other    => {
-                fluid.display(true, false, true, 0.4, 0.8, 1, true, false);
+            VisualMode::Other      => {
+                fluid.display(true, false, false, 0.4, 0.7, 1, false, true);
+                fluid.streamline(30, 10, 100, 0.07, 0.2);
             }
-            VisualMode::Blank    => {}
+            VisualMode::Streamline => {
+                fluid.display(false, false, false, 1.0, 10.0, 1000, false, true);
+                fluid.streamline(30, 10, 100, 0.07, 0.2);
+            }
+            VisualMode::Blank      => {}
         } if is_key_pressed(KeyCode::V) {
             display = display.rotate();
         }

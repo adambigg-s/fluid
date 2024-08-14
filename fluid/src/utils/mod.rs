@@ -84,9 +84,9 @@ impl Clamp for f32 {
                 
                 "movss {result}, xmm0",
 
-                value = in(xmm_reg) value,
-                min = in(xmm_reg) min,
-                max = in(xmm_reg) max,
+                value  = in(xmm_reg)  value,
+                min    = in(xmm_reg)  min,
+                max    = in(xmm_reg)  max,
                 result = out(xmm_reg) result,
                 options(nostack),
             );

@@ -148,10 +148,10 @@ impl Fluid {
                 "1:",
                 "mov {result}, 0",
                 "2:",
-                x = in(reg) x,
-                y = in(reg) y,
-                bx = in(reg) self.x,
-                by = in(reg) self.y,
+                x      = in(reg)       x,
+                y      = in(reg)       y,
+                bx     = in(reg)       self.x,
+                by     = in(reg)       self.y,
                 result = out(reg_byte) result,
                 options(nostack, nomem, preserves_flags),
             );
@@ -188,10 +188,11 @@ impl Fluid {
         // assert maintainable boundary conditions on 4 sides
         self.fill_left_border(Ele::Source(Source::construct(self.source_velocity, 0.0)));
         self.fill_right_border(Ele::Clone(Clone::construct(-1, 0)));
-        self.fill_top_border(Ele::Static);
+        self.fill_top_border(Ele::Clone(Clone::construct(0, 1)));
         self.fill_bot_border(Ele::Static);
 
         // add standard geometry
+        self.create_rectangle(_xx * 3 / 8, _yy * 4 / 5, _xx * 5 / 8, _yy-1);
 
         // apply boundary conditions to all elements initalized 
         self.enforce_boundary_conditions();
@@ -392,6 +393,55 @@ impl Fluid {
         }
     }
 
+    pub fn streamline(&self, spacing_x: usize, spacing_y: usize, max_steps: usize, step_size: f32, thickness: f32) {
+        let mut streamlines: Vec<Vec<Vector<f32>>> = Vec::new();
+
+        for y in (0..self.y).step_by(spacing_y) {
+            for x in (0..self.x).step_by(spacing_x) {
+                let seed = Vector::construct(x as f32, y as f32);
+                let streamline = self.compute_streamline(seed, max_steps, step_size);
+                streamlines.push(streamline);
+            }
+        }
+
+        for streamline in streamlines {
+            let len = streamline.len();
+            if len < 1 { continue; }
+            for idx in 0..(len-1) {
+                draw_line(
+                    streamline[idx].x * self.cell_size, 
+                    streamline[idx].y * self.cell_size, 
+                    streamline[idx+1].x * self.cell_size, 
+                    streamline[idx+1].y * self.cell_size, 
+                    thickness, 
+                    WHITE,
+                );
+            }
+        }
+    }
+
+    fn compute_streamline(&self, seed: Vector<f32>, max_steps: usize, step_size: f32) -> Vec<Vector<f32>> {
+        let mut streamline = Vec::new();
+        let (mut x, mut y) = (seed.x, seed.y);
+
+        for _ in 0..max_steps {
+            streamline.push(
+                Vector::construct(x, y)
+            );
+            let u = self.double_lin_int(x, y, "u");
+            let v = self.double_lin_int(x, y, "v");
+
+            x += u * step_size;
+            y += v * step_size;
+
+            if !self.inbounds(x as usize, y as usize) {
+                break;
+            }
+        }
+
+        streamline
+    }
+
     pub fn update_fluid(&mut self, project: bool, advect: bool, enforce_bc: bool, vort_confinement: bool) {
         if advect {
             self.semi_lagrangian_advection();
@@ -514,22 +564,106 @@ impl Fluid {
         (self.v[y+1][x-1] + self.v[y+1][x] + self.v[y][x-1] + self.v[y][x]) * 0.25
     }
 
+    #[cfg(target_arch = "never")]
+    fn apply_vorticity_confinement(&mut self) {
+        self.compute_vorticity();
+
+        for i in 1..self.y-1 {
+            for j in 1..self.x-1 {
+                let half: f32 = 0.5;
+                let gwx: f32;
+                let gwy: f32;
+
+                unsafe {
+                    arch::asm!(
+                        "movss xmm0, [{vorticity1}]",
+                        "movss xmm1, [{vorticity2}]",
+                        "subss xmm0, xmm1",
+                        "mulss xmm0, [{half}]",
+                        "movss [{grad_w_x}], xmm0",
+
+                        "movss xmm1, [{vorticity3}]",
+                        "movss xmm2, [{vorticity4}]",
+                        "subss xmm1, xmm2",
+                        "mulss xmm1, [{half}]",
+                        "movss [{grad_w_y}], xmm1",
+
+                        grad_w_x   = out(xmm_reg) gwx,
+                        grad_w_y   = out(xmm_reg) gwy,
+                        vorticity1 = in(reg)      &self.vorticity[i][j+1],
+                        vorticity2 = in(reg)      &self.vorticity[i][j-1],
+                        vorticity3 = in(reg)      &self.vorticity[i+1][j],
+                        vorticity4 = in(reg)      &self.vorticity[i-1][j],
+                        half       = in(reg)      &half,
+                        options(nostack)
+                    );
+                }
+
+                let magnitude: f32 = Vector::construct(gwx, gwy).magnitude();
+                if magnitude > 1e-6 {
+                    self.apply_vorticity_force(gwx, gwy, magnitude, i, j);
+                }
+                println!("{}{}", gwy, gwx);
+            }
+        }
+    }
+
+    #[cfg(target_arch = "never")]
+    fn apply_vorticity_force(&mut self, grad_w_x: f32, grad_w_y: f32, magnitude: f32, i: usize, j: usize) {
+        let force_x: f32;
+        let force_y: f32;
+        
+        unsafe {
+            arch::asm!(
+                "movss xmm0, [{gwx}]",
+                "movss xmm1, [{gwy}]",
+                "movss xmm2, [{mag}]",
+                "movss xmm3, [{vort}]",
+                
+                "divss xmm0, xmm2",
+                "divss xmm1, xmm2",
+                
+                "mulss xmm0, xmm3",
+                "mulss xmm1, xmm3",
+
+                "mulss xmm0, [{epsilon}]",
+                "mulss xmm1, [{epsilon}]",
+
+                "movss [{fx}], xmm0",
+                "movss [{fy}], xmm1",
+
+                fx      = out(xmm_reg) force_x,
+                fy      = out(xmm_reg) force_y,
+                gwx     = in(reg)      &grad_w_x,
+                gwy     = in(reg)      &grad_w_y,
+                mag     = in(reg)      &magnitude,
+                epsilon = in(reg)      &self.epsilon,
+                vort    = in(reg)      &self.vorticity[i][j],
+                options(nostack)
+            );
+            
+            self.u[i][j] += force_x * self.delta_t;
+            self.v[i][j] += force_y * self.delta_t;
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
     fn apply_vorticity_confinement(&mut self) {
         self.compute_vorticity();
 
         for i in 1..self.y-1 {
             for j in 1..self.x-1 {
 
-                let grad_w_x = (self.vorticity[i][j+1] - self.vorticity[i][j-1]) * 0.5;
-                let grad_w_y = (self.vorticity[i+1][j] - self.vorticity[i-1][j]) * 0.5;
+                let grad_w_x: f32 = (self.vorticity[i][j+1] - self.vorticity[i][j-1]) * 0.5;
+                let grad_w_y: f32 = (self.vorticity[i+1][j] - self.vorticity[i-1][j]) * 0.5;
 
                 let magnitude = Vector::construct(grad_w_x, grad_w_y).magnitude();
                 if magnitude > 1e-6 {
-                    let nx = grad_w_x / magnitude;
-                    let ny = grad_w_y / magnitude;
+                    let nx: f32 = grad_w_x / magnitude;
+                    let ny: f32 = grad_w_y / magnitude;
 
-                    let force_x = self.epsilon * (ny * self.vorticity[i][j]);
-                    let force_y = -self.epsilon * (nx * self.vorticity[i][j]);
+                    let force_x: f32 = self.epsilon * (ny * self.vorticity[i][j]);
+                    let force_y: f32 = -self.epsilon * (nx * self.vorticity[i][j]);
                     
                     self.u[i][j] += force_x * self.delta_t;
                     self.v[i][j] += force_y * self.delta_t;
@@ -537,7 +671,7 @@ impl Fluid {
             }
         }
     }
-    
+
     #[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
     #[cfg(target_arch = "x86_64")]
     fn compute_vorticity(&mut self) {
@@ -568,14 +702,14 @@ impl Fluid {
 
                         "movss [{vorticity_ij}], xmm0",
 
-                        dwdy = out(xmm_reg) _dwdy,
-                        dudx = out(xmm_reg) _dudx,
-                        u_plus1_j = in(reg) &self.u[i + 1][j],
-                        u_minus1_j = in(reg) &self.u[i - 1][j],
-                        v_i_jplus1 = in(reg) &self.v[i][j + 1],
-                        v_i_jminus1 = in(reg) &self.v[i][j - 1],
-                        half = in(reg) &half,
-                        vorticity_ij = in(reg) &mut self.vorticity[i][j],
+                        dwdy         = out(xmm_reg) _dwdy,
+                        dudx         = out(xmm_reg) _dudx,
+                        u_plus1_j    = in(reg)      &self.u[i + 1][j],
+                        u_minus1_j   = in(reg)      &self.u[i - 1][j],
+                        v_i_jplus1   = in(reg)      &self.v[i][j + 1],
+                        v_i_jminus1  = in(reg)      &self.v[i][j - 1],
+                        half         = in(reg)      &half,
+                        vorticity_ij = in(reg)      &mut self.vorticity[i][j],
                         options(nostack),
                     );
                 }
