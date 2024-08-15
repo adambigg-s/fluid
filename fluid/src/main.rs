@@ -34,6 +34,7 @@ async fn main() {
     let mut state: State = State::new();
     let mut display: VisualMode = VisualMode::new();
     let mut p_mouse: Option<Vector<f32>> = None;
+    let mut diag: bool = true;
 
     println!("Grid Size: {}", fluid.x * fluid.y);
 
@@ -41,7 +42,7 @@ async fn main() {
     // runs some additional iterations thru the projection phase of the grid-solver. 
     // this is used to just sort of "get some slack" out of the matrix, as the startup 
     // phase takes the longest to converge in most cases
-    for _ in 0..15 {
+    for _ in 0..3 {
         fluid.update_fluid(true, false, false, false);
     }
 
@@ -64,7 +65,7 @@ async fn main() {
             }
             VisualMode::Streamline => {
                 fluid.display(false, false, false, 1.0, 10.0, 1000, false, true);
-                fluid.streamline(30, 10, 100, 0.07, 0.2);
+                fluid.streamline(30, 8, 155, 0.05, 0.2);
             }
             VisualMode::Blank      => {}
         } if is_key_pressed(KeyCode::V) {
@@ -116,20 +117,25 @@ async fn main() {
             fluid.reset();
         }
 
-        draw_text(
-            &format!("FPS: {}", get_fps()),
-            30.0,
-            20.0,
-            20.0,
-            RED,
-        );
-        draw_text(
-            &format!("b.c. len: {}", fluid.boundaries.len()),
-            30.0,
-            40.0,
-            20.0,
-            RED,
-        );
+        if is_key_pressed(KeyCode::K) {
+            diag = !diag;
+        }
+        if diag {
+            draw_text(
+                &format!("FPS: {}", get_fps()),
+                30.0,
+                20.0,
+                20.0,
+                RED,
+            );
+            draw_text(
+                &format!("b.c. len: {}", fluid.boundaries.len()),
+                30.0,
+                40.0,
+                20.0,
+                RED,
+            );
+        }
 
         // awaits next frame, optional delay but usually set to 0 as the sims run slow anyway
         next_frame().await;

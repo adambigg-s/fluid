@@ -5,17 +5,17 @@ use macroquad::prelude::*;
 
 
 
-static SCALE_FACTOR: usize = 3;
-static WIDTH: usize = 60 * SCALE_FACTOR;
+static SCALE_FACTOR: usize = 32;
+static WIDTH: usize = 80 * SCALE_FACTOR;
 static HEIGHT: usize = 20 * SCALE_FACTOR;
 static CELL_SIZE: f32 = 35.0 / (SCALE_FACTOR as f32);
 static OVERRELAXATION: f32 = 1.97;
-static ITERS: usize = 135;
-static DELTA_T: f32 = 0.25;
-static SOURCE_V: f32 = 70.0;
+static ITERS: usize = 150;
+static DELTA_T: f32 = 0.1;
+static SOURCE_V: f32 = 80.0;
 static VISUAL_MOD: f32 = 2.0;
-static GRID_SIZE: f32 = 4.0;
-static VORT_CONF_EPSILON: f32 = 0.3;
+static GRID_SIZE: f32 = 2.0;
+static VORT_CONF_EPSILON: f32 = 0.5;
 
 /// used to pass all simulation configuration information from <config> module into main to 
 /// construct fluid

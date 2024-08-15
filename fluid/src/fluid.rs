@@ -186,13 +186,21 @@ impl Fluid {
         let _yy = self.y;
 
         // assert maintainable boundary conditions on 4 sides
-        self.fill_left_border(Ele::Source(Source::construct(self.source_velocity, 0.0)));
         self.fill_right_border(Ele::Clone(Clone::construct(-1, 0)));
-        self.fill_top_border(Ele::Clone(Clone::construct(0, 1)));
+        self.fill_top_border(Ele::Static);
         self.fill_bot_border(Ele::Static);
+        for i in 0..self.y {
+            let mut oo = Oo::construct(0, i, self);
+            if _yy * 5 / 11 < i && i < _yy * 6 / 11 {
+                oo.set_here(Ele::Source(Source::construct(oo.fluid.source_velocity, 0.0)));
+            }
+            else {
+                oo.set_here(Ele::Static);
+            }
+        }
 
         // add standard geometry
-        self.create_rectangle(_xx * 3 / 8, _yy * 4 / 5, _xx * 5 / 8, _yy-1);
+        self.create_circle(_xx / 5, _yy / 2, (_yy / 11) as f32);
 
         // apply boundary conditions to all elements initalized 
         self.enforce_boundary_conditions();
@@ -200,7 +208,7 @@ impl Fluid {
 
     /// places circular geometry at a location in the simulation
     #[allow(dead_code)]
-    fn crate_circle(&mut self, center_x: usize, center_y: usize, radius: f32) {
+    fn create_circle(&mut self, center_x: usize, center_y: usize, radius: f32) {
         for y in 0..self.y {
             for x in 0..self.x {
                 if (x as f32 - center_x as f32).powf(2.0) 
@@ -225,6 +233,7 @@ impl Fluid {
         }
     }
 
+    #[allow(dead_code)]
     fn fill_top_border(&mut self, fill: Ele) {
         for x in 0..self.x {
             let mut oo = Oo::construct(x, 0, self);
@@ -232,6 +241,7 @@ impl Fluid {
         }
     }
 
+    #[allow(dead_code)]
     fn fill_bot_border(&mut self, fill: Ele) {
         for x in 0..self.x {
             let mut oo = Oo::construct(x, self.y-1, self);
@@ -239,6 +249,7 @@ impl Fluid {
         }
     }
 
+    #[allow(dead_code)]
     fn fill_right_border(&mut self, fill: Ele) {
         for y in 0..self.y {
             let mut oo = Oo::construct(self.x-1, y, self);
@@ -246,6 +257,7 @@ impl Fluid {
         }
     }
 
+    #[allow(dead_code)]
     fn fill_left_border(&mut self, fill: Ele) {
         for y in 0..self.y {
             let mut oo = Oo::construct(0, y, self);
@@ -603,7 +615,6 @@ impl Fluid {
                 if magnitude > 1e-6 {
                     self.apply_vorticity_force(gwx, gwy, magnitude, i, j);
                 }
-                println!("{}{}", gwy, gwx);
             }
         }
     }
