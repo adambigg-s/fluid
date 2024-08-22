@@ -97,9 +97,9 @@ async fn main() {
 
         // used to sort of "draw" boundaries 
         if is_key_down(KeyCode::W) {
-            place_tool(&mut p_mouse, &mut fluid, "place");
+            place_tool(&mut p_mouse, &mut fluid, "place", 3);
         } else if is_key_down(KeyCode::D) {
-            place_tool(&mut p_mouse, &mut fluid, "delete");
+            place_tool(&mut p_mouse, &mut fluid, "delete", 3);
         } else {
             p_mouse = None;
         }
@@ -129,7 +129,7 @@ async fn main() {
                 RED,
             );
             draw_text(
-                &format!("b.c. len: {}", fluid.boundaries.len()),
+                &format!("b.c. len: {}", fluid.boundaries_dep.len()),
                 30.0,
                 40.0,
                 20.0,

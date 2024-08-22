@@ -10,7 +10,7 @@ use crate::fluidapi;
 
 
 use macroquad::prelude::*;
-use std::arch;
+use std::{arch, collections::HashSet};
 
 
 
@@ -66,28 +66,29 @@ impl Ele {
 
 #[derive(Debug)]
 pub struct Fluid {
-    pub x: usize,
-    pub y: usize,
+    pub x:               usize,
+    pub y:               usize,
 
-    pub u: Vec<Vec<f32>>,
-    pub v: Vec<Vec<f32>>,
-    pub nu: Vec<Vec<f32>>,
-    pub nv: Vec<Vec<f32>>,
-    pub vorticity: Vec<Vec<f32>>,
+    pub u:               Vec<Vec<f32>>,
+    pub v:               Vec<Vec<f32>>,
+    pub nu:              Vec<Vec<f32>>,
+    pub nv:              Vec<Vec<f32>>,
+    pub vorticity:       Vec<Vec<f32>>,
 
-    pub element: Vec<Vec<Ele>>,
+    pub element:         Vec<Vec<Ele>>,
 
-    pub overrelaxation: f32,
-    pub iters: usize,
-    pub delta_t: f32,
+    pub overrelaxation:  f32,
+    pub iters:           usize,
+    pub delta_t:         f32,
     pub source_velocity: f32,
-    pub grid_size: f32,
-    pub epsilon: f32,
+    pub grid_size:       f32,
+    pub epsilon:         f32,
 
     pub visual_modifier: f32,
-    pub cell_size: f32,
+    pub cell_size:       f32,
 
-    pub boundaries: Vec<Vector<usize>>,
+    pub boundaries_dep:  Vec<Vector<usize>>,
+    pub boundaries:      HashSet<Vector<usize>>,
 }
 
 impl Fluid {
@@ -116,7 +117,8 @@ impl Fluid {
             visual_modifier: config.visual_modifier,
             cell_size: config.cell_size,
 
-            boundaries: Vec::new(),
+            boundaries_dep: Vec::new(),
+            boundaries: HashSet::new(),
         }
     }
 
@@ -127,7 +129,8 @@ impl Fluid {
         self.nu = vec![vec![0.0; self.x + 1]; self.y];
         self.nv = vec![vec![0.0; self.x]; self.y + 1];
         self.element = vec![vec![Ele::Fluid; self.x]; self.y];
-        self.boundaries = Vec::new();
+        self.boundaries_dep = Vec::new();
+        self.boundaries = HashSet::new();
         self.assert_boundary_conditions();
     }
 
@@ -742,7 +745,7 @@ impl Fluid {
     }
 
     fn enforce_boundary_conditions(&mut self) {
-        for position in self.boundaries.clone() {
+        for position in self.boundaries_dep.clone() {
             let mut oo: Oo = Oo::construct(position.x, position.y, self);
             match oo.peek_element_here(0, 0) {
                 Ele::Static       => {

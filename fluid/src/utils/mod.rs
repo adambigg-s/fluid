@@ -61,6 +61,14 @@ pub fn get_directions_26() -> [(isize, isize, isize); 26] {
     ]
 }
 
+fn iter_grid(x: usize, y: usize, bound: isize) -> impl Iterator<Item = (usize, usize)> {
+    (-bound..=bound).flat_map(move |dx| {
+        (-bound..=bound).map(move |dy| {
+            ((x as isize + dx) as usize, (y as isize + dy) as usize)
+        })
+    })
+}
+
 #[allow(dead_code)]
 pub trait Clamp {
     fn clamped(&self, min: Self, max: Self) -> Self;
@@ -108,7 +116,7 @@ impl Clamp for f32 {
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Debug)]
+#[derive(PartialEq, Clone, Copy, Debug, Eq, Hash)]
 pub struct Vector<T> {
     pub x: T,
     pub y: T,
@@ -207,7 +215,7 @@ fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
     )
 }
 
-pub fn interpolate_f32(prev: Vector<f32>, curr: Vector<f32>) -> Vec<Vector<f32>> {
+pub fn interpolate_f32(curr: Vector<f32>, prev: Vector<f32>) -> Vec<Vector<f32>> {
     let dx = prev.x - curr.x;
     let dy = prev.y - curr.y;
     let distance = Vector::construct(dx, dy).magnitude();
@@ -232,17 +240,20 @@ pub fn interpolate_f32(prev: Vector<f32>, curr: Vector<f32>) -> Vec<Vector<f32>>
     points
 }
 
-pub fn place_tool(prev: &mut Option<Vector<f32>>, fluid: &mut Fluid, mode: &str) {
+pub fn place_tool(prev: &mut Option<Vector<f32>>, fluid: &mut Fluid, mode: &str, size: usize) {
     match mode {
         "place" => {
             let now = mouse_position().to_vector();
             if let Some(prev) = prev {
                 let points = interpolate_f32(*prev, now);
                 for point in points {
-                    fluid.assert_boundary_place(
+                    for (nx, ny) in iter_grid(
                         (point.x / fluid.cell_size) as usize, 
                         (point.y / fluid.cell_size) as usize,
-                    );
+                        size as isize,
+                    ) {
+                        fluid.assert_boundary_place(nx, ny);
+                    }
                 }
             }
             *prev = Some(now);
@@ -252,10 +263,13 @@ pub fn place_tool(prev: &mut Option<Vector<f32>>, fluid: &mut Fluid, mode: &str)
             if let Some(prev) = prev {
                 let points = interpolate_f32(*prev, now);
                 for point in points {
-                    fluid.assert_boundary_delete(
+                    for (nx, ny) in iter_grid(
                         (point.x / fluid.cell_size) as usize, 
                         (point.y / fluid.cell_size) as usize,
-                    );
+                        size as isize,
+                    ) {
+                        fluid.assert_boundary_delete(nx, ny);
+                    }
                 }
             }
             *prev = Some(now);
@@ -263,3 +277,4 @@ pub fn place_tool(prev: &mut Option<Vector<f32>>, fluid: &mut Fluid, mode: &str)
         _ => {}
     }
 }
+

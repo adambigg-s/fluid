@@ -40,19 +40,24 @@ impl<'a> Oo<'a> {
     /// places an Ele at the current Oo's location 
     pub fn set_here(&mut self, cell: Ele) {
         self.fluid.element[self.y][self.x] = cell;
-        if !self.fluid.boundaries.contains( &Vector::construct(self.x, self.y) ){
-            self.fluid.boundaries.push( Vector::construct(self.x, self.y) );
+        if !self.fluid.boundaries_dep.contains( &Vector::construct(self.x, self.y) ){
+            self.fluid.boundaries_dep.push( Vector::construct(self.x, self.y) );
         }
+
+        self.fluid.element[self.y][self.x] = cell;
+        self.fluid.boundaries.insert( Vector::construct(self.x, self.y) );
     }
 
     /// reverts the current cell back to Fluid
     pub fn remove_here(&mut self) {
-        self.fluid.element[self.y][self.x] = Ele::Fluid;
-        if let Some(idx) = self.fluid.boundaries.iter().position(
+        if let Some(idx) = self.fluid.boundaries_dep.iter().position(
             |vec| *vec == Vector::construct(self.x, self.y)
         ) {
-            self.fluid.boundaries.remove(idx);
+            self.fluid.boundaries_dep.remove(idx);
         }
+
+        self.fluid.element[self.y][self.x] = Ele::Fluid;
+        self.fluid.boundaries.remove( &Vector::construct(self.x, self.y) );
     }
 
     /// returns the Ele type of the the selected grid cell, able to see anywhere
