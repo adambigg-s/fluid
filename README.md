@@ -1,7 +1,7 @@
 # fluid
 fluid simulation 
 
-written with a small amount of x86! be warned, if this repo is cloned on non-intel devices, it may not compile. later maybe support for all processors will be added. 
+written with a small amount of x86! be warned, might not compile for you if hardware is signifigantly differing 
 
 my hardware: 
 - intel core i9-7900x
@@ -12,3 +12,9 @@ my hardware:
 
 a cylinder getting hit by a puff of air 
 ![alt text](https://github.com/adambigg-s/fluid/blob/main/examples/cylinder_stream_composite.png)
+
+flow over a box sitting on impenetrable surface
+![alt text](https://github.com/adambigg-s/fluid/blob/main/examples/low_speed_box_flow.png)
+
+low-speed flow over a Gottingen 1919 airfoil 
+![alt text](https://github.com/adambigg-s/fluid/blob/main/examples/gottingen_1919.png)
