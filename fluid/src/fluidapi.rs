@@ -8,14 +8,12 @@ use crate::utils;
 
 use std::arch;
 
-
-
 use fluid::{Ele, Fluid};
 use utils::{get_directions, Vector};
 
 
 
-/// represents a coordinate in the cartesian fluid grid along with a mutable reference to the fluid struct 
+/// represents a coordinate in the cartesian fluid grid along with a mutable reference to the fluid struct
 ///
 /// the Oo struct is used to safely interact with the staggered fluid grids a specific (x, y) coordinate
 /// and their adjacent cells. this wrapper struct provides methods to modify the fluid and it's properties
@@ -24,11 +22,11 @@ use utils::{get_directions, Vector};
 pub struct Oo<'a> {
     /// the x coordinate of the cell in the fluid grid
     pub x: usize,
-    
+
     /// the y coordinate of the cell in the fluid grid
     pub y: usize,
 
-    /// a mutable reference to the Fluid struct allowing modifaction and reading of data by Oo 
+    /// a mutable reference to the Fluid struct allowing modifaction and reading of data by Oo
     pub fluid: &'a mut Fluid,
 }
 
@@ -37,27 +35,40 @@ impl<'a> Oo<'a> {
         Oo { x, y, fluid }
     }
 
-    /// places an Ele at the current Oo's location 
+    /// places an Ele at the current Oo's location
     pub fn set_here(&mut self, cell: Ele) {
         self.fluid.element[self.y][self.x] = cell;
-        if !self.fluid.boundaries_dep.contains( &Vector::construct(self.x, self.y) ){
-            self.fluid.boundaries_dep.push( Vector::construct(self.x, self.y) );
+        if !self
+            .fluid
+            .boundaries_dep
+            .contains(&Vector::construct(self.x, self.y))
+        {
+            self.fluid
+                .boundaries_dep
+                .push(Vector::construct(self.x, self.y));
         }
 
         self.fluid.element[self.y][self.x] = cell;
-        self.fluid.boundaries.insert( Vector::construct(self.x, self.y) );
+        self.fluid
+            .boundaries
+            .insert(Vector::construct(self.x, self.y));
     }
 
     /// reverts the current cell back to Fluid
     pub fn remove_here(&mut self) {
-        if let Some(idx) = self.fluid.boundaries_dep.iter().position(
-            |vec| *vec == Vector::construct(self.x, self.y)
-        ) {
+        if let Some(idx) = self
+            .fluid
+            .boundaries_dep
+            .iter()
+            .position(|vec| *vec == Vector::construct(self.x, self.y))
+        {
             self.fluid.boundaries_dep.remove(idx);
         }
 
         self.fluid.element[self.y][self.x] = Ele::Fluid;
-        self.fluid.boundaries.remove( &Vector::construct(self.x, self.y) );
+        self.fluid
+            .boundaries
+            .remove(&Vector::construct(self.x, self.y));
     }
 
     /// returns the Ele type of the the selected grid cell, able to see anywhere
@@ -104,9 +115,7 @@ impl<'a> Oo<'a> {
     }
 
     pub fn divergence_here(&self) -> f32 {
-        self.peek_velocity(1, 0) 
-            - self.peek_velocity(-1, 0) 
-            + self.peek_velocity(0, 1)
+        self.peek_velocity(1, 0) - self.peek_velocity(-1, 0) + self.peek_velocity(0, 1)
             - self.peek_velocity(0, -1)
     }
 
@@ -126,16 +135,16 @@ impl<'a> Oo<'a> {
     }
 
     pub fn set_velocity_polarized(&mut self, set_x: f32, set_y: f32) {
-        *self.peek_velocity_mut(1, 0)  = set_x;
+        *self.peek_velocity_mut(1, 0) = set_x;
         *self.peek_velocity_mut(-1, 0) = set_x;
-        *self.peek_velocity_mut(0, 1)  = set_y;
+        *self.peek_velocity_mut(0, 1) = set_y;
         *self.peek_velocity_mut(0, -1) = set_y;
     }
 
     pub fn set_velocity_zeros(&mut self) {
-        *self.peek_velocity_mut(1, 0)  = 0.0;
+        *self.peek_velocity_mut(1, 0) = 0.0;
         *self.peek_velocity_mut(-1, 0) = 0.0;
-        *self.peek_velocity_mut(0, 1)  = 0.0;
+        *self.peek_velocity_mut(0, 1) = 0.0;
         *self.peek_velocity_mut(0, -1) = 0.0;
     }
 
@@ -153,9 +162,9 @@ impl<'a> Oo<'a> {
             v01 = refr.peek_velocity(0, 1);
             v0n = refr.peek_velocity(0, -1);
         }
-        *self.peek_velocity_mut(1, 0)  = v10 * damping;
+        *self.peek_velocity_mut(1, 0) = v10 * damping;
         *self.peek_velocity_mut(-1, 0) = vn0 * damping;
-        *self.peek_velocity_mut(0, 1)  = v01 * damping;
+        *self.peek_velocity_mut(0, 1) = v01 * damping;
         *self.peek_velocity_mut(0, -1) = v0n * damping;
     }
 
@@ -170,7 +179,7 @@ impl<'a> Oo<'a> {
     }
 
     /// simply converts relative coordinates into valid, absolute indicies in
-    /// the fluid's grid. this function gets called a lot of times, so it is 
+    /// the fluid's grid. this function gets called a lot of times, so it is
     /// converted into x86 to ensure it's quick quick
     #[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
     #[cfg(target_arch = "x86_64")]
@@ -183,7 +192,7 @@ impl<'a> Oo<'a> {
                 "mov {tx}, {x}",
                 "add {tx}, {dx}",
                 "mov {nx}, {tx}",
-                
+
                 "mov {ty}, {y}",
                 "add {ty}, {dy}",
                 "mov {ny}, {ty}",
@@ -202,7 +211,7 @@ impl<'a> Oo<'a> {
 
         (nx, ny)
     }
-    
+
     #[cfg(not(target_arch = "x86_64"))]
     pub fn index(&self, dx: isize, dy: isize) -> (usize, usize) {
         let nx: usize = ((self.x as isize) + dx) as usize;

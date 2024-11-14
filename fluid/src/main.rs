@@ -1,25 +1,23 @@
 
 
 
+mod clone;
 mod config;
 mod fluid;
-mod utils;
-mod clone;
-mod source;
 mod fluidapi;
-mod units;
 mod legacy;
+mod source;
+mod units;
+mod utils;
 
 
 
 use macroquad::prelude::*;
 use std::{env, time::Duration};
 
-
-
 use config::{configuration, Config, State, VisualMode};
 use fluid::Fluid;
-use utils::{Vector, place_tool};
+use utils::{place_tool, Vector};
 
 
 
@@ -39,15 +37,15 @@ async fn main() {
     println!("Grid Size: {}", fluid.x * fluid.y);
 
     fluid.assert_boundary_conditions();
-    // runs some additional iterations thru the projection phase of the grid-solver. 
-    // this is used to just sort of "get some slack" out of the matrix, as the startup 
+    // runs some additional iterations thru the projection phase of the grid-solver.
+    // this is used to just sort of "get some slack" out of the matrix, as the startup
     // phase takes the longest to converge in most cases
     for _ in 0..3 {
         fluid.update_fluid(true, false, false, false);
     }
 
     // starts loop for update-draw cycle
-    loop {
+    while !is_key_pressed(KeyCode::Escape) {
         clear_background(Color::from_hex(0x121212));
 
         // visual enum used to select different visuals. blank mode is used to remove draw-loop overhead
@@ -68,7 +66,8 @@ async fn main() {
                 fluid.streamline(30, 8, 155, 0.05, 0.2);
             }
             VisualMode::Blank      => {}
-        } if is_key_pressed(KeyCode::V) {
+        }
+        if is_key_pressed(KeyCode::V) {
             display = display.rotate();
         }
 
@@ -81,7 +80,7 @@ async fn main() {
         // passes time on sim
         if state == State::Simulation {
             fluid.update_fluid(true, true, true, true);
-        } 
+        }
         if is_key_pressed(KeyCode::P) {
             state = state.rotate();
         }
@@ -95,7 +94,7 @@ async fn main() {
             fluid.update_fluid(false, false, true, false);
         }
 
-        // used to sort of "draw" boundaries 
+        // used to sort of "draw" boundaries
         if is_key_down(KeyCode::W) {
             place_tool(&mut p_mouse, &mut fluid, "place", 3);
         } else if is_key_down(KeyCode::D) {
@@ -107,12 +106,12 @@ async fn main() {
         if is_key_down(KeyCode::W) && is_key_down(KeyCode::F) {
             let (x, y) = mouse_position();
             fluid.fill_dfs(
-                (x / fluid.cell_size) as usize, 
-                (y / fluid.cell_size) as usize
+                (x / fluid.cell_size) as usize,
+                (y / fluid.cell_size) as usize,
             );
         }
 
-        // resets all placed boundaries and current fluid state 
+        // resets all placed boundaries and current fluid state
         if is_key_pressed(KeyCode::R) {
             fluid.reset();
         }
@@ -121,13 +120,7 @@ async fn main() {
             diag = !diag;
         }
         if diag {
-            draw_text(
-                &format!("FPS: {}", get_fps()),
-                30.0,
-                20.0,
-                20.0,
-                RED,
-            );
+            draw_text(&format!("FPS: {}", get_fps()), 30.0, 20.0, 20.0, RED);
             draw_text(
                 &format!("b.c. len: {}", fluid.boundaries_dep.len()),
                 30.0,

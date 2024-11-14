@@ -1,14 +1,7 @@
-
-
-
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-
-
-use std::ops::{Add, Mul, Div, Sub};
-
-
+use std::ops::{Add, Div, Mul, Sub};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Meter(pub f32);

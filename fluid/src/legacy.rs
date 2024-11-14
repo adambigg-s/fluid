@@ -1,6 +1,3 @@
-
-
-
 /*
 
     pub fn advection(&mut self) {
@@ -181,8 +178,8 @@ pub fn get_color_vec(vec: &Vector<f32>, max: f32) -> Color {
                 (y / fluid.cell_size) as usize,
             );
             fluid.assert_boundary_place(x, y);
-        } 
-        
+        }
+
     // pub fn assert_static_velocity(&mut self) {
     //     for stat in self.statics.clone() {
     //         let mut oo: Oo = Oo::construct(stat.x, stat.y, self);
@@ -200,7 +197,7 @@ pub fn get_color_vec(vec: &Vector<f32>, max: f32) -> Color {
     fn semi_lagrangian_advection_depricated(&mut self) {
         for y in 0..self.y {
             for x in 0..self.x {
-                
+
                 if self.element[y][x] != DiffEle::Fluid {
                     continue;
                 }
@@ -219,7 +216,7 @@ pub fn get_color_vec(vec: &Vector<f32>, max: f32) -> Color {
         self.u.clone_from(&self.nu);
         self.v.clone_from(&self.nv);
     }
-    
+
     fn double_lin_int_depricated(&self, x: f32, y: f32, field: &str) -> f32 {
         let field = match field {
             "u" => &self.u,
