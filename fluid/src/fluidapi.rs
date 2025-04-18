@@ -24,7 +24,7 @@ pub struct Oo<'a> {
 }
 
 impl<'a> Oo<'a> {
-    pub fn construct(x: usize, y: usize, fluid: &'a mut Fluid) -> Oo {
+    pub fn construct(x: usize, y: usize, fluid: &'a mut Fluid) -> Oo<'a> {
         Oo { x, y, fluid }
     }
 
