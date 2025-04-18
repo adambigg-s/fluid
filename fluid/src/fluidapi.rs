@@ -1,17 +1,10 @@
-
-
-
 use crate::fluid;
 use crate::utils;
-
-
 
 use std::arch;
 
 use fluid::{Ele, Fluid};
 use utils::{get_directions, Vector};
-
-
 
 /// represents a coordinate in the cartesian fluid grid along with a mutable reference to the fluid struct
 ///
@@ -38,37 +31,24 @@ impl<'a> Oo<'a> {
     /// places an Ele at the current Oo's location
     pub fn set_here(&mut self, cell: Ele) {
         self.fluid.element[self.y][self.x] = cell;
-        if !self
-            .fluid
-            .boundaries_dep
-            .contains(&Vector::construct(self.x, self.y))
-        {
-            self.fluid
-                .boundaries_dep
-                .push(Vector::construct(self.x, self.y));
+        if !self.fluid.boundaries_dep.contains(&Vector::construct(self.x, self.y)) {
+            self.fluid.boundaries_dep.push(Vector::construct(self.x, self.y));
         }
 
         self.fluid.element[self.y][self.x] = cell;
-        self.fluid
-            .boundaries
-            .insert(Vector::construct(self.x, self.y));
+        self.fluid.boundaries.insert(Vector::construct(self.x, self.y));
     }
 
     /// reverts the current cell back to Fluid
     pub fn remove_here(&mut self) {
-        if let Some(idx) = self
-            .fluid
-            .boundaries_dep
-            .iter()
-            .position(|vec| *vec == Vector::construct(self.x, self.y))
+        if let Some(idx) =
+            self.fluid.boundaries_dep.iter().position(|vec| *vec == Vector::construct(self.x, self.y))
         {
             self.fluid.boundaries_dep.remove(idx);
         }
 
         self.fluid.element[self.y][self.x] = Ele::Fluid;
-        self.fluid
-            .boundaries
-            .remove(&Vector::construct(self.x, self.y));
+        self.fluid.boundaries.remove(&Vector::construct(self.x, self.y));
     }
 
     /// returns the Ele type of the the selected grid cell, able to see anywhere
@@ -79,7 +59,8 @@ impl<'a> Oo<'a> {
         let (nx, ny): (usize, usize) = self.index(dx, dy);
         if self.fluid.inbounds(nx, ny) {
             self.fluid.element[ny][nx]
-        } else {
+        }
+        else {
             Ele::Static
         }
     }
@@ -87,11 +68,11 @@ impl<'a> Oo<'a> {
     pub fn peek_velocity(&self, dx: isize, dy: isize) -> f32 {
         let (nx, ny): (usize, usize) = self.index(dx, dy);
         match (dx, dy) {
-            (1, 0)  => self.fluid.u[self.y][nx],
+            (1, 0) => self.fluid.u[self.y][nx],
             (-1, 0) => self.fluid.u[self.y][self.x],
-            (0, 1)  => self.fluid.v[ny][self.x],
+            (0, 1) => self.fluid.v[ny][self.x],
             (0, -1) => self.fluid.v[self.y][self.x],
-            _       => {
+            _ => {
                 eprintln!("OOB Error checking neighbor");
                 std::process::exit(1);
             }
@@ -103,11 +84,11 @@ impl<'a> Oo<'a> {
     pub fn peek_velocity_mut(&mut self, dx: isize, dy: isize) -> &mut f32 {
         let (nx, ny): (usize, usize) = self.index(dx, dy);
         match (dx, dy) {
-            (1, 0)  => &mut self.fluid.u[self.y][nx],
+            (1, 0) => &mut self.fluid.u[self.y][nx],
             (-1, 0) => &mut self.fluid.u[self.y][self.x],
-            (0, 1)  => &mut self.fluid.v[ny][self.x],
+            (0, 1) => &mut self.fluid.v[ny][self.x],
             (0, -1) => &mut self.fluid.v[self.y][self.x],
-            _       => {
+            _ => {
                 eprintln!("OOB Error fetching neighbor velocity reference");
                 std::process::exit(37);
             }

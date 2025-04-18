@@ -1,13 +1,8 @@
-
-
-
 use crate::clone;
 use crate::config;
 use crate::fluidapi;
 use crate::source;
 use crate::utils;
-
-
 
 use macroquad::prelude::*;
 use std::{arch, collections::HashSet};
@@ -17,8 +12,6 @@ use config::Config;
 use fluidapi::Oo;
 use source::Source;
 use utils::{get_color_vec, get_directions, Vector};
-
-
 
 /// union enum used to store state of grid's contained elements
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -44,10 +37,10 @@ impl Ele {
     #[allow(dead_code)]
     pub fn to_strslice(self) -> &'static str {
         match self {
-            Self::Fluid     => "Fluid",
-            Self::Static    => "Solid",
+            Self::Fluid => "Fluid",
+            Self::Static => "Solid",
             Self::Source(_) => "Emitter",
-            Self::Clone(_)  => "Match",
+            Self::Clone(_) => "Match",
         }
     }
 
@@ -188,22 +181,40 @@ impl Fluid {
 
         // assert maintainable boundary conditions on 4 sides
         self.fill_right_border(Ele::Clone(Clone::construct(-1, 0)));
-        self.fill_top_border(Ele::Static);
+        // self.fill_top_border(Ele::Clone(Clone::construct(0, 1)));
         self.fill_bot_border(Ele::Static);
+        self.fill_top_border(Ele::Static);
+        // self.fill_bot_border(Ele::Clone(Clone::construct(0, -1)));
         for i in 0..self.y {
             let mut oo = Oo::construct(0, i, self);
-            if _yy * 5 / 11 < i && i < _yy * 6 / 11 {
-                oo.set_here(Ele::Source(Source::construct(
-                    oo.fluid.source_velocity,
-                    0.0,
-                )));
-            } else {
+            if _yy * 2 / 11 < i && i < _yy * 9 / 11 && i % 2 == 0 {
+                oo.set_here(Ele::Source(Source::construct(oo.fluid.source_velocity, 0.0)));
+            }
+            else {
                 oo.set_here(Ele::Static);
             }
         }
+        // for i in 0..self.y {
+        //     let mut oo = Oo::construct(0, i, self);
+        //     oo.set_here(Ele::Source(Source::construct(oo.fluid.source_velocity, 0.0)));
+        // }
+
+        // for i in 0..self.y {
+        //     if i % 20 == 0  && i != 0 {
+        //         self.create_circle(14, i, 10.0);
+        //     }
+        // }
+
+        let circ_center = (25, 155);
+
+        self.create_circle(circ_center.0, circ_center.1, 65.0);
+        self.create_circle(circ_center.0, _yy - circ_center.1, 65.0);
+        self.create_rectangle(0, 0, circ_center.0 * 2, circ_center.1);
+        self.create_rectangle(0, _yy - circ_center.1, circ_center.0 * 2, _yy);
+        self.create_rectangle(25, _yy * 10 / 21, 50, _yy * 11 / 21);
 
         // add standard geometry
-        self.create_circle(_xx / 5, _yy / 2, (_yy / 11) as f32);
+        // self.create_circle(_xx / 5, _yy / 2, (_yy / 11) as f32);
 
         // apply boundary conditions to all elements initalized
         self.enforce_boundary_conditions();
@@ -322,15 +333,8 @@ impl Fluid {
 
     #[allow(clippy::too_many_arguments)]
     pub fn display(
-        &mut self,
-        head: bool,
-        draw_bounds: bool,
-        normalize: bool,
-        thickness: f32,
-        head_size: f32,
-        spacing: usize,
-        vector: bool,
-        fill: bool,
+        &mut self, head: bool, draw_bounds: bool, normalize: bool, thickness: f32, head_size: f32,
+        spacing: usize, vector: bool, fill: bool,
     ) {
         for y in 0..self.y {
             for x in 0..self.x {
@@ -365,11 +369,8 @@ impl Fluid {
                 velocity.add(0.0, oo.peek_velocity(0, 1));
                 velocity.add(0.0, oo.peek_velocity(0, -1));
 
-                let color: Color = get_color_vec(
-                    &velocity,
-                    oo.fluid.source_velocity,
-                    oo.fluid.visual_modifier,
-                );
+                let color: Color =
+                    get_color_vec(&velocity, oo.fluid.source_velocity, oo.fluid.visual_modifier);
 
                 if vector {
                     let nsize = self.cell_size * 2.5;
@@ -383,23 +384,15 @@ impl Fluid {
                         x: x as f32 * self.cell_size + self.cell_size / 2.0,
                         y: y as f32 * self.cell_size + self.cell_size / 2.0,
                     };
-                    draw_line(
-                        start.x,
-                        start.y,
-                        start.x + velocity.x,
-                        start.y + velocity.y,
-                        thickness,
-                        color,
-                    );
+                    draw_line(start.x, start.y, start.x + velocity.x, start.y + velocity.y, thickness, color);
 
                     if head {
                         draw_circle(start.x + velocity.x, start.y + velocity.y, head_size, color);
                     }
-                } else if fill {
-                    let start: Vector<f32> = Vector {
-                        x: x as f32 * self.cell_size,
-                        y: y as f32 * self.cell_size,
-                    };
+                }
+                else if fill {
+                    let start: Vector<f32> =
+                        Vector { x: x as f32 * self.cell_size, y: y as f32 * self.cell_size };
                     draw_rectangle(start.x, start.y, self.cell_size, self.cell_size, color);
                 }
             }
@@ -407,12 +400,7 @@ impl Fluid {
     }
 
     pub fn streamline(
-        &self,
-        spacing_x: usize,
-        spacing_y: usize,
-        max_steps: usize,
-        step_size: f32,
-        thickness: f32,
+        &self, spacing_x: usize, spacing_y: usize, max_steps: usize, step_size: f32, thickness: f32,
     ) {
         let mut streamlines: Vec<Vec<Vector<f32>>> = Vec::new();
 
@@ -442,12 +430,7 @@ impl Fluid {
         }
     }
 
-    fn compute_streamline(
-        &self,
-        seed: Vector<f32>,
-        max_steps: usize,
-        step_size: f32,
-    ) -> Vec<Vector<f32>> {
+    fn compute_streamline(&self, seed: Vector<f32>, max_steps: usize, step_size: f32) -> Vec<Vector<f32>> {
         let mut streamline = Vec::new();
         let (mut x, mut y) = (seed.x, seed.y);
 
@@ -467,13 +450,7 @@ impl Fluid {
         streamline
     }
 
-    pub fn update_fluid(
-        &mut self,
-        project: bool,
-        advect: bool,
-        enforce_bc: bool,
-        vort_confinement: bool,
-    ) {
+    pub fn update_fluid(&mut self, project: bool, advect: bool, enforce_bc: bool, vort_confinement: bool) {
         if advect {
             self.semi_lagrangian_advection();
         }
@@ -521,10 +498,7 @@ impl Fluid {
         for i in 1..self.y {
             for j in 1..self.x {
                 // u component
-                if i < self.y - 1
-                    && !self.element[i][j - 1].is_static()
-                    && !self.element[i][j].is_static()
-                {
+                if i < self.y - 1 && !self.element[i][j - 1].is_static() && !self.element[i][j].is_static() {
                     let u = self.u[i][j];
                     let v = self.average_v(j, i);
 
@@ -538,10 +512,7 @@ impl Fluid {
                 }
 
                 // v component
-                if j < self.x - 1
-                    && !self.element[i - 1][j].is_static()
-                    && !self.element[i][j].is_static()
-                {
+                if j < self.x - 1 && !self.element[i - 1][j].is_static() && !self.element[i][j].is_static() {
                     let u = self.average_u(j, i);
                     let v = self.v[i][j];
 
@@ -584,10 +555,7 @@ impl Fluid {
         let sx = 1.0 - tx;
         let sy = 1.0 - ty;
 
-        sx * sy * field[y0][x0]
-            + tx * sy * field[y0][x1]
-            + tx * ty * field[y1][x1]
-            + sx * ty * field[y1][x0]
+        sx * sy * field[y0][x0] + tx * sy * field[y0][x1] + tx * ty * field[y1][x1] + sx * ty * field[y1][x0]
     }
 
     fn average_u(&self, x: usize, y: usize) -> f32 {
@@ -642,14 +610,7 @@ impl Fluid {
     }
 
     #[cfg(target_arch = "never")]
-    fn apply_vorticity_force(
-        &mut self,
-        grad_w_x: f32,
-        grad_w_y: f32,
-        magnitude: f32,
-        i: usize,
-        j: usize,
-    ) {
+    fn apply_vorticity_force(&mut self, grad_w_x: f32, grad_w_y: f32, magnitude: f32, i: usize, j: usize) {
         let force_x: f32;
         let force_y: f32;
 
@@ -772,16 +733,16 @@ impl Fluid {
         for position in self.boundaries_dep.clone() {
             let mut oo: Oo = Oo::construct(position.x, position.y, self);
             match oo.peek_element_here(0, 0) {
-                Ele::Static       => {
+                Ele::Static => {
                     oo.set_velocity_zeros();
                 }
                 Ele::Source(sour) => {
                     oo.set_velocity_polarized(sour.velocity.x, sour.velocity.y);
                 }
-                Ele::Clone(clo)   => {
+                Ele::Clone(clo) => {
                     oo.set_velocity_matched(clo.master.x, clo.master.y);
                 }
-                _                 => {}
+                _ => {}
             }
         }
     }

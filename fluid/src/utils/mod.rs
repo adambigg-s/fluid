@@ -1,24 +1,12 @@
-
-
-
 use crate::fluid;
-
-
 
 use macroquad::prelude::*;
 
 use fluid::Fluid;
 
-
-
 /// 4 directions adjacent to a cell on a cartesian grid
 pub fn get_directions() -> [(isize, isize); 4] {
-    [
-        (-1, 0) , 
-        (1 , 0) , 
-        (0 , -1), 
-        (0 , 1)
-    ]
+    [(-1, 0), (1, 0), (0, -1), (0, 1)]
 }
 
 /// 8 directions adjacent to a cell on a cartesian grid
@@ -26,16 +14,7 @@ pub fn get_directions() -> [(isize, isize); 4] {
 /// with no actual direct contact with master cell
 #[allow(dead_code)]
 pub fn get_directions_8() -> [(isize, isize); 8] {
-    [
-        (-1, 0),
-        (1 , 0),
-        (0 , -1),
-        (0 , 1),
-        (1 , 1),
-        (1 , -1),
-        (-1, 1),
-        (-1, -1),
-    ]
+    [(-1, 0), (1, 0), (0, -1), (0, 1), (1, 1), (1, -1), (-1, 1), (-1, -1)]
 }
 
 /// returns all adjacent cell's relative indicies in a 3d cartesian
@@ -43,32 +22,32 @@ pub fn get_directions_8() -> [(isize, isize); 8] {
 #[allow(dead_code)]
 pub fn get_directions_26() -> [(isize, isize, isize); 26] {
     [
-        (1 , 0 , 0),
-        (1 , 1 , 0),
-        (1 , -1, 0),
-        (0 , 1 , 0),
-        (0 , -1, 0),
-        (-1, 0 , 0),
-        (-1, 1 , 0),
+        (1, 0, 0),
+        (1, 1, 0),
+        (1, -1, 0),
+        (0, 1, 0),
+        (0, -1, 0),
+        (-1, 0, 0),
+        (-1, 1, 0),
         (-1, -1, 0),
-        (0 , 0 , 1),
-        (0 , 0 , -1),
-        (1 , 0 , 1),
-        (1 , 0 , -1),
-        (1 , 1 , 1),
-        (1 , 1 , -1),
-        (1 , -1, 1),
-        (1 , -1, -1),
-        (-1, 0 , 1),
-        (-1, 0 , -1),
-        (-1, 1 , 1),
-        (-1, 1 , -1),
+        (0, 0, 1),
+        (0, 0, -1),
+        (1, 0, 1),
+        (1, 0, -1),
+        (1, 1, 1),
+        (1, 1, -1),
+        (1, -1, 1),
+        (1, -1, -1),
+        (-1, 0, 1),
+        (-1, 0, -1),
+        (-1, 1, 1),
+        (-1, 1, -1),
         (-1, -1, 1),
         (-1, -1, -1),
-        (0 , 1 , 1),
-        (0 , 1 , -1),
-        (0 , -1, 1),
-        (0 , -1, -1),
+        (0, 1, 1),
+        (0, 1, -1),
+        (0, -1, 1),
+        (0, -1, -1),
     ]
 }
 
@@ -117,9 +96,11 @@ impl Clamp for f32 {
         assert!(min <= max);
         if self < &min {
             min
-        } else if self > &max {
+        }
+        else if self > &max {
             max
-        } else {
+        }
+        else {
             *self
         }
     }
@@ -143,10 +124,7 @@ impl ToVector for (f32, f32) {
 
 impl<T: Default> Vector<T> {
     pub fn new() -> Vector<T> {
-        Vector {
-            x: T::default(),
-            y: T::default(),
-        }
+        Vector { x: T::default(), y: T::default() }
     }
 }
 
@@ -217,11 +195,7 @@ fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
         _ => (1.0, 1.0, 1.0),
     };
 
-    (
-        ((r + m) * 255.0) as u8,
-        ((g + m) * 255.0) as u8,
-        ((b + m) * 255.0) as u8,
-    )
+    (((r + m) * 255.0) as u8, ((g + m) * 255.0) as u8, ((b + m) * 255.0) as u8)
 }
 
 pub fn interpolate_f32(curr: Vector<f32>, prev: Vector<f32>) -> Vec<Vector<f32>> {

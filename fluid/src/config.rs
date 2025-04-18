@@ -1,21 +1,16 @@
-
-
-
 use macroquad::prelude::*;
 
-
-
-static SCALE_FACTOR: usize = 3;
-static WIDTH: usize = 80 * SCALE_FACTOR;
+static SCALE_FACTOR: usize = 25;
+static WIDTH: usize = 20 * SCALE_FACTOR;
 static HEIGHT: usize = 20 * SCALE_FACTOR;
 static CELL_SIZE: f32 = 35.0 / (SCALE_FACTOR as f32);
 static OVERRELAXATION: f32 = 1.97;
-static ITERS: usize = 150;
-static DELTA_T: f32 = 0.1;
-static SOURCE_V: f32 = 130.0;
+static ITERS: usize = 100;
+static DELTA_T: f32 = 0.2;
+static SOURCE_V: f32 = 145.0;
 static VISUAL_MOD: f32 = 2.0;
 static GRID_SIZE: f32 = 2.0;
-static VORT_CONF_EPSILON: f32 = 0.5;
+static VORT_CONF_EPSILON: f32 = 0.3;
 
 /// used to pass all simulation configuration information from <config> module into main to
 /// construct fluid
@@ -73,7 +68,7 @@ impl State {
     pub fn rotate(&self) -> State {
         match self {
             Self::Simulation => Self::Pause,
-            Self::Pause      => Self::Simulation,
+            Self::Pause => Self::Simulation,
         }
     }
 }
@@ -96,11 +91,11 @@ impl VisualMode {
 
     pub fn rotate(&self) -> VisualMode {
         match self {
-            Self::Gradient   => Self::Vector,
-            Self::Vector     => Self::Other,
-            Self::Other      => Self::Streamline,
+            Self::Gradient => Self::Vector,
+            Self::Vector => Self::Other,
+            Self::Other => Self::Streamline,
             Self::Streamline => Self::Blank,
-            Self::Blank      => Self::Gradient,
+            Self::Blank => Self::Gradient,
         }
     }
 }

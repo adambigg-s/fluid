@@ -1,6 +1,3 @@
-
-
-
 mod clone;
 mod config;
 mod fluid;
@@ -10,16 +7,12 @@ mod source;
 mod units;
 mod utils;
 
-
-
 use macroquad::prelude::*;
 use std::{env, time::Duration};
 
 use config::{configuration, Config, State, VisualMode};
 use fluid::Fluid;
 use utils::{place_tool, Vector};
-
-
 
 #[macroquad::main(configuration)]
 async fn main() {
@@ -32,7 +25,7 @@ async fn main() {
     let mut state: State = State::new();
     let mut display: VisualMode = VisualMode::new();
     let mut p_mouse: Option<Vector<f32>> = None;
-    let mut diag: bool = true;
+    let mut diag: bool = false;
 
     println!("Grid Size: {}", fluid.x * fluid.y);
 
@@ -51,13 +44,13 @@ async fn main() {
         // visual enum used to select different visuals. blank mode is used to remove draw-loop overhead
         // and to allow faster iterations for long running sims
         match display {
-            VisualMode::Gradient   => {
+            VisualMode::Gradient => {
                 fluid.display(true, false, false, 0.4, 0.7, 1, false, true);
             }
-            VisualMode::Vector     => {
+            VisualMode::Vector => {
                 fluid.display(true, true, false, 0.4, 0.7, 1, true, false);
             }
-            VisualMode::Other      => {
+            VisualMode::Other => {
                 fluid.display(true, false, false, 0.4, 0.7, 1, false, true);
                 fluid.streamline(30, 10, 100, 0.07, 0.2);
             }
@@ -65,7 +58,7 @@ async fn main() {
                 fluid.display(false, false, false, 1.0, 10.0, 1000, false, true);
                 fluid.streamline(30, 8, 155, 0.05, 0.2);
             }
-            VisualMode::Blank      => {}
+            VisualMode::Blank => {}
         }
         if is_key_pressed(KeyCode::V) {
             display = display.rotate();
@@ -73,7 +66,8 @@ async fn main() {
 
         if is_key_pressed(KeyCode::Key6) {
             fluid.visual_modifier = 0.0_f32.max(fluid.visual_modifier - 0.1);
-        } else if is_key_pressed(KeyCode::Key7) {
+        }
+        else if is_key_pressed(KeyCode::Key7) {
             fluid.visual_modifier = 100.0_f32.min(fluid.visual_modifier + 0.1);
         }
 
@@ -88,27 +82,28 @@ async fn main() {
         // manual update of specific stages - used for debugging mainly to see where crashes / instabilty occur
         if is_mouse_button_pressed(MouseButton::Left) {
             fluid.update_fluid(true, false, false, false);
-        } else if is_mouse_button_pressed(MouseButton::Right) {
+        }
+        else if is_mouse_button_pressed(MouseButton::Right) {
             fluid.update_fluid(false, true, false, false);
-        } else if is_key_down(KeyCode::B) {
+        }
+        else if is_key_down(KeyCode::B) {
             fluid.update_fluid(false, false, true, false);
         }
 
         // used to sort of "draw" boundaries
         if is_key_down(KeyCode::W) {
             place_tool(&mut p_mouse, &mut fluid, "place", 3);
-        } else if is_key_down(KeyCode::D) {
+        }
+        else if is_key_down(KeyCode::D) {
             place_tool(&mut p_mouse, &mut fluid, "delete", 3);
-        } else {
+        }
+        else {
             p_mouse = None;
         }
 
         if is_key_down(KeyCode::W) && is_key_down(KeyCode::F) {
             let (x, y) = mouse_position();
-            fluid.fill_dfs(
-                (x / fluid.cell_size) as usize,
-                (y / fluid.cell_size) as usize,
-            );
+            fluid.fill_dfs((x / fluid.cell_size) as usize, (y / fluid.cell_size) as usize);
         }
 
         // resets all placed boundaries and current fluid state
@@ -121,13 +116,7 @@ async fn main() {
         }
         if diag {
             draw_text(&format!("FPS: {}", get_fps()), 30.0, 20.0, 20.0, RED);
-            draw_text(
-                &format!("b.c. len: {}", fluid.boundaries_dep.len()),
-                30.0,
-                40.0,
-                20.0,
-                RED,
-            );
+            draw_text(&format!("b.c. len: {}", fluid.boundaries_dep.len()), 30.0, 40.0, 20.0, RED);
         }
 
         // awaits next frame, optional delay but usually set to 0 as the sims run slow anyway

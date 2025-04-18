@@ -51,10 +51,7 @@ struct Quantity<U> {
 
 impl<U> Quantity<U> {
     fn new(value: f32) -> Self {
-        Quantity {
-            value,
-            _unit: std::marker::PhantomData,
-        }
+        Quantity { value, _unit: std::marker::PhantomData }
     }
 }
 
